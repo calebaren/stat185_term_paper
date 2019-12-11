@@ -1,0 +1,235 @@
+---
+title: "Spherelets"
+subtitle: "Stat 185 Term Paper"
+author: "Caleb Ren"
+date: "December 14, 2019"
+geometry: margin = 2cm
+output: 
+  pdf_document:
+    extra_dependencies: ['algorithm', 'algorithmic']
+    number_sections: true
+    toc: true
+    fig_caption: yes
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=T, message=F, warning=F,
+                      fig.height=4, fig.align='center', fig.pos="H")
+set.seed(185)
+require(scatterplot3d)
+require(kableExtra)
+require(scales)
+source('spca_functions.R')
+```
+\newpage
+
+\section{Introduction}
+
+Whereas principal component analysis (PCA) is an eigenvalue/eigenvector problem from an inherently *linear* dimension reduction problem, 
+
+\section{Method}
+
+\subsection{Spherical PCA}
+
+Given a set of data $\vec{x}_1, \dots, \vec{x}_N \in \mathbb{R}^D$, we find the best approximating sphere $S_{V}(c,r)$, where $c$ is the center, $r$ is the radius, and $V \in \mathbb{R}^{(d+1) \times (d+1)}$ is the $(d+1)$th dimensional affine subspace the sphere lives on. For any point in the dataset $\vec{x}_i$, the closest point $\vec{y}_i$ lying on the sphere $S_V(c,r)$ is the point that minimizes Euclidean distance $\|x,y\|^2$ between $x$ and $y$. The optimal subspace $V$ is given by $\hat{V} = (\vec{v}_1, \dots, \vec{v}_{d+1})$, where $\vec{v}_i, i \in \{1,\dots,d+1\}$ is the $i$th eigenvector ranked in descending order of $(\mathbf{X} - 1_N\bar{\mathbf{X}})^T(\mathbf{X} - 1_N\bar{\mathbf{X}})$.
+
+If $\vec{z}_i = \bar{\mathbf{X}} + \hat{V}\hat{V}^T(\vec{x}_i - \bar{\mathbf{X}})$ are a change of basis to affine subspace $V$, then it can be shown that the minimizing pair $(\vec{\eta}^\star, \vec{\xi}^\star)$ of loss function $g(\vec{\eta}, \vec{\xi}) = \sum_{k = 1}^N(\vec{z}_i^T \vec{z}_i + \vec{\eta}^T \vec{x}_i + \vec{\xi})^2$ is:
+
+$$
+\begin{gathered}
+\vec{\eta} = -H^{-1}\omega \\
+\vec{\xi} = -\frac{1}{N} \sum_{k=1}^N(\vec{z}_i^T \vec{z}_i + \vec{\eta}^T\vec{z}_i)
+\end{gathered}
+$$
+
+where $H$ and $\omega$ are defined as:
+
+$$
+\begin{gathered}
+H = \sum_{k = 1}^N (\vec{z}_i - \overline{z})(\vec{z}_i - \vec{z})^T \\
+\vec{\omega} = \sum_{k=1}^N \left( \|\vec{z}_i^T\vec{z}_i\| - \frac{1}{N}\sum_{j=1}^N\|\vec{z}_j^T\vec{z}_j\| \right) (\vec{z}_i - \overline{z})
+\end{gathered}
+$$
+
+The optimal parametrization $(\hat{V}, \hat{c}, \hat{r})$ of the projection of $\mathbf{X} \in \mathbb{R}^{N \times D}$ onto the sphere $S_V(c, r)$ is:
+
+$$
+\begin{gathered}
+\hat{V} = (\vec{v}_1, \dots, \vec{v}_{d + 1}) \\
+\hat{c} = -\frac{\vec{\eta}^\star}{2}  \\
+\hat{r} = \frac{1}{N} \sum_{k = 1}^N \left\|\vec{z}_i - \hat{c} \right\|
+\end{gathered}
+$$
+
+The projection map $\hat{\Psi}$ of data matrix $\mathbf{X}$ onto sphere $S_{\hat{V}}(\hat{c}, \hat{r})$ is the projection map onto affine subspace $\hat{c} + \hat{V}$, given by:
+
+$$
+\hat{\Psi}(\vec{x}_i) = \hat{c} + \frac{\hat{r}}{\| \hat{V}\hat{V}^T (\vec{x}_i - \hat{c}) \|}\hat{V}\hat{V}^T(\vec{x}_i - \hat{c})
+$$
+
+\subsection{Local SPCA}
+
+We have now defined spherical PCA (SPCA) to project the data $\mathbf{X}$ down to single sphere $S_V$. However, this single sphere will typically not be a sufficient approximation for the inherent manifold $M$. Instead, we partition the space $\mathbb{R}^D$ into $k$ disjoint subsets $C_1, \dots, C_k$. For the $k$th disjoint subset, we can define a data matrix $\mathbf{X}_k = \{X_i : X_i \in C_k\}$ that is a partition of the original data that lies within $C_k$. After applying SPCA to $\mathbf{X}_k$, we obtain spherical volume, center, and radius $(\hat{V}_k, \hat{c}_k, \hat{r}_k)$ alongside projection map $\Phi_k$ as a map from $x\in C_k$ to $y \in S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k)$. A spherelets estimation $\hat{M}$ of the manifold $M$ can be obtained by setting $\hat{M} = \bigcup_{k = 1}^K \hat{M}_k$, where $\hat{M}_k$ is the local SPCA in the $k$th region and $\hat{M}_k = S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k) \cap C_k$
+
+\subsection{Assumptions}
+
+There are two main
+
+\subsection{Method}
+
+The algorithm is as follows:
+
+\begin{algorithm}[H]
+  \caption{Spherelets}
+  \textbf{Input:} Data matrix $\mathbf{X}$; intrinsic dimension $d$; partition $\{C_k\}_{k = 1}^K$ \\
+  \textbf{Output:} Local estimated manifolds $\hat{M}_k$ and projection map $\hat{\Psi}_k, k \in \{1, \dots, K\}$; global estimated manifold $\hat{M}$ of intrinsic manifold $M$ and projection map $\hat{\Psi}$
+  \begin{algorithmic}[1]
+    \FOR{(k = 1 : K)}
+      \STATE Define $\mathbf{X}_{[k]} = \mathbf{X} \cap C_k$\; \\
+      \STATE Calculate $\hat{V}_k, \hat{c}_k, \hat{r}_k$\; \\
+      \STATE Calculate $\hat{\Psi}_k(x) = \hat{c}_k + \frac{\hat{r}_k}{\|\hat{V}_k\hat{V}_k^T(x-\hat{c}_k)\|}(x - \hat{c}_k)$\; \\
+      \STATE Calculate $\hat{M}_k = S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k) \cap C_k$\;
+    \ENDFOR
+    \STATE Calculate $\hat{\Psi}(x) = \sum_{k = 1}^K \mathbf{1}_{\{x \in C_k\}}\hat{\Psi}_k(x)$, and $\hat{M} = \bigcup_{k =1}^K\hat{M}_k$.
+  \end{algorithmic}
+\end{algorithm}
+
+\section{Strengths and Weaknesses}
+
+\subsection{Strengths}
+
+  - Performs well in areas with high curvature that local PCA can't approximate
+  - Can perform OOS assessments and returns the underlying manifold
+  
+\subsection{Weaknesses}
+  - Struggles with areas of non-uniform curvature
+  - Struggles with non-uniform dimensions
+  - Must specify inherent dimension $d$
+  - Computationally expensive
+  - Dependent on choice of manifold subsetting
+
+\section{Examples}
+
+To generate numerical examples, I used the `SPCA` and `SS_calc` functions written by co-author Minerva Mukhopadhyay [@github]. The `SPCA` function takes in a matrix of $N$ observations $\vec{x}_i \in \mathbb{R}^{D}, i \in 1, \dots, N$ and returns the error given by spherical and local PCA (`SS` and `SS_new`), as well as the projected values `Y_D`.
+
+```{r example_setup}
+
+partition <- function(data, k) {
+  # partitions data
+  bin <- floor(nrow(data) / k)
+  sto <- vector(mode = "list", length = k)
+  for (i in 1:k) {
+    if (i == k) {
+      sto[[i]] <- data[(1 + (i - 1) * bin) : nrow(data),]
+    }
+    else {
+      sto[[i]] <- data[(1+ (i-1) * bin):(i*bin),]
+    }
+  }
+  return(sto)
+}
+
+spca <- function(x, dimension) {
+  out <- SPCA(x, dimension)
+  ss_out <- SS_calc(X = x, mu = colMeans(x), c = out$c,
+                    V = out$V, r = out$r, d = dimension, 
+                    c.d = out$c_d)
+  return(ss_out)
+}
+```
+
+\subsection{Euler Spiral}
+
+```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 3, 8$.'}
+# generating euler spiral data
+s <- seq(0, 3, by = 0.001)
+data <- matrix(rep(0, 2 * length(s)), ncol = 2)
+for (i in 1:length(s)) {
+  data[i,1] <- integrate(function(t) sin(t^2),
+                     lower = 0,
+                     upper = s[i])$value
+  data[i,2] <- integrate(function(t) cos(t^2),
+                     lower = 0,
+                     upper = s[i])$value
+}
+
+par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
+euler <- function(k) {
+  d <- partition(data, k)
+  spca_d <- lapply(d, FUN = function(x) spca(x, 2))
+  rainbow_cols <- alpha(sample(rainbow(k)), 0.08)
+  plot(data, type = "l", lwd = 4,
+       xlab = "", ylab = "")
+  for (i in 1:k) {
+    points(spca_d[[i]]$Y_D, col = rainbow_cols[i], pch = 19, cex = 0.6)
+  }
+}
+
+euler(3); euler(10)
+```
+
+\subsection{Helix}
+
+```{r helix, fig.cap='Spherical PCA performed on a helix with $k = 3, 8$.'}
+# generating helix data
+s <- seq(0, 6*pi, by=0.1)
+data <- matrix(c(cos(s), sin(s), s), ncol = 3)
+
+# spherical pca on helix
+par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
+spiral <- function(k) {
+  d <- partition(data, k)
+  spca_d <- lapply(d, FUN = function(x) spca(x, 3))
+  rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
+  spl <- scatterplot3d(data, type = "l", lwd = 4,
+                       xlab = "", ylab = "", zlab = "")
+  for (i in 1:k) {
+    spl$points3d(spca_d[[i]]$Y_D, 
+                 col = rainbow_cols[i], pch = 19, cex = 0.6)
+  }
+}
+
+spiral(3); spiral(8)
+```
+
+\subsection{Cylinder}
+
+```{r cylinder, fig.cap='Spherical PCA performed on a cylinder with $k = 3, 8$.'}
+N <- 10^3
+theta <- runif(N, 0, 2*pi)
+data <- matrix(c(cos(theta), sin(theta), sort(runif(N, 0, 5))), 
+               ncol = 3)
+
+# spherical pca on cylinder
+par(mfrow = c(1, 3), mar = c(1, 1, 1, 1))
+cylinder <- function(k, new.plot = F) {
+  d <- partition(data, k)
+  spca_d <- lapply(d, FUN = function(x) spca(x, 3))
+  rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
+  if (new.plot) {
+    spl <- scatterplot3d(data, color = rgb(0, 0, 0, 0.5),
+                       xlab = "", ylab = "", zlab = "", 
+                       mar = c(1, 1, 1, 1))
+  }
+  mse <- c()
+  for (i in 1:k) {
+    if (new.plot) {
+      spl$points3d(spca_d[[i]]$Y_D, 
+                 col = rainbow_cols[i], pch = 19, cex = 0.2)
+    }
+    mse <- c(mse, (spca_d[[i]]$Y_D - d[[i]])^2)
+  }
+  return(mean(mse))
+}
+
+cylinder(3, new.plot = T); cylinder(8, new.plot = T)
+vec_cylinder <- Vectorize(cylinder)
+plot(vec_cylinder(1:10), main = "MSE", xlab = "k")
+```
+
+We see that SPCA is not fully capable of handling a cylinder.
+
+\newpage
+
+\section{References}

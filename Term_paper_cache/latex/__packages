@@ -1,0 +1,9 @@
+base
+scatterplot3d
+MASS
+plot3D
+class
+Matrix
+irlba
+kableExtra
+scales
