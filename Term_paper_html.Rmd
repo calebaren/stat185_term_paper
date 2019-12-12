@@ -1,18 +1,13 @@
 ---
 title: "Spherelets"
-knit: (function(input_file, encoding) {
-  out_dir <- 'docs';
-  rmarkdown::render(input_file,
- encoding=encoding,
- output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 subtitle: "Stat 185 Term Paper"
 author: "Caleb Ren"
 date: "December 14, 2019"
 geometry: margin = 2cm
 output: 
   html_document:
-    extra_dependencies: ['algorithm', 'algorithmic']
     fig_caption: yes
+    theme: cosmo
 bibliography: bibliography.bib
 ---
 
@@ -25,15 +20,16 @@ require(kableExtra)
 require(scales)
 source('spca_functions.R')
 ```
-\newpage
 
-\section{Introduction}
+# {.tabset .tabset-pills .tabset-fade}
 
-Whereas principal component analysis (PCA) is an eigenvalue/eigenvector problem from an inherently *linear* dimension reduction problem, 
+## Introduction
 
-\section{Method}
+Whereas principal component analysis (PCA) is an eigenvalue/eigenvector problem from an inherently *linear* dimension reduction problem, [@li2017]
 
-\subsection{Spherical PCA}
+## Method
+
+### Spherical PCA
 
 Given a set of data $\vec{x}_1, \dots, \vec{x}_N \in \mathbb{R}^D$, we find the best approximating sphere $S_{V}(c,r)$, where $c$ is the center, $r$ is the radius, and $V \in \mathbb{R}^{(d+1) \times (d+1)}$ is the $(d+1)$th dimensional affine subspace the sphere lives on. For any point in the dataset $\vec{x}_i$, the closest point $\vec{y}_i$ lying on the sphere $S_V(c,r)$ is the point that minimizes Euclidean distance $\|x,y\|^2$ between $x$ and $y$. The optimal subspace $V$ is given by $\hat{V} = (\vec{v}_1, \dots, \vec{v}_{d+1})$, where $\vec{v}_i, i \in \{1,\dots,d+1\}$ is the $i$th eigenvector ranked in descending order of $(\mathbf{X} - 1_N\bar{\mathbf{X}})^T(\mathbf{X} - 1_N\bar{\mathbf{X}})$.
 
@@ -71,48 +67,33 @@ $$
 \hat{\Psi}(\vec{x}_i) = \hat{c} + \frac{\hat{r}}{\| \hat{V}\hat{V}^T (\vec{x}_i - \hat{c}) \|}\hat{V}\hat{V}^T(\vec{x}_i - \hat{c})
 $$
 
-\subsection{Local SPCA}
+### Local SPCA
 
 We have now defined spherical PCA (SPCA) to project the data $\mathbf{X}$ down to single sphere $S_V$. However, this single sphere will typically not be a sufficient approximation for the inherent manifold $M$. Instead, we partition the space $\mathbb{R}^D$ into $k$ disjoint subsets $C_1, \dots, C_k$. For the $k$th disjoint subset, we can define a data matrix $\mathbf{X}_k = \{X_i : X_i \in C_k\}$ that is a partition of the original data that lies within $C_k$. After applying SPCA to $\mathbf{X}_k$, we obtain spherical volume, center, and radius $(\hat{V}_k, \hat{c}_k, \hat{r}_k)$ alongside projection map $\Phi_k$ as a map from $x\in C_k$ to $y \in S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k)$. A spherelets estimation $\hat{M}$ of the manifold $M$ can be obtained by setting $\hat{M} = \bigcup_{k = 1}^K \hat{M}_k$, where $\hat{M}_k$ is the local SPCA in the $k$th region and $\hat{M}_k = S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k) \cap C_k$
 
-\subsection{Assumptions}
+### Assumptions
 
 There are two main
 
-\subsection{Method}
+### Method
 
 The algorithm is as follows:
 
-\begin{algorithm}[H]
-  \caption{Spherelets}
-  \textbf{Input:} Data matrix $\mathbf{X}$; intrinsic dimension $d$; partition $\{C_k\}_{k = 1}^K$ \\
-  \textbf{Output:} Local estimated manifolds $\hat{M}_k$ and projection map $\hat{\Psi}_k, k \in \{1, \dots, K\}$; global estimated manifold $\hat{M}$ of intrinsic manifold $M$ and projection map $\hat{\Psi}$
-  \begin{algorithmic}[1]
-    \FOR{(k = 1 : K)}
-      \STATE Define $\mathbf{X}_{[k]} = \mathbf{X} \cap C_k$\; \\
-      \STATE Calculate $\hat{V}_k, \hat{c}_k, \hat{r}_k$\; \\
-      \STATE Calculate $\hat{\Psi}_k(x) = \hat{c}_k + \frac{\hat{r}_k}{\|\hat{V}_k\hat{V}_k^T(x-\hat{c}_k)\|}(x - \hat{c}_k)$\; \\
-      \STATE Calculate $\hat{M}_k = S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k) \cap C_k$\;
-    \ENDFOR
-    \STATE Calculate $\hat{\Psi}(x) = \sum_{k = 1}^K \mathbf{1}_{\{x \in C_k\}}\hat{\Psi}_k(x)$, and $\hat{M} = \bigcup_{k =1}^K\hat{M}_k$.
-  \end{algorithmic}
-\end{algorithm}
+## Strengths and Weaknesses
 
-\section{Strengths and Weaknesses}
-
-\subsection{Strengths}
+### Strengths
 
   - Performs well in areas with high curvature that local PCA can't approximate
   - Can perform OOS assessments and returns the underlying manifold
   
-\subsection{Weaknesses}
+### Weaknesses
   - Struggles with areas of non-uniform curvature
   - Struggles with non-uniform dimensions
   - Must specify inherent dimension $d$
   - Computationally expensive
   - Dependent on choice of manifold subsetting
 
-\section{Examples}
+## Examples
 
 To generate numerical examples, I used the `SPCA` and `SS_calc` functions written by co-author Minerva Mukhopadhyay [@github]. The `SPCA` function takes in a matrix of $N$ observations $\vec{x}_i \in \mathbb{R}^{D}, i \in 1, \dots, N$ and returns the error given by spherical and local PCA (`SS` and `SS_new`), as well as the projected values `Y_D`.
 
@@ -142,7 +123,7 @@ spca <- function(x, dimension) {
 }
 ```
 
-\subsection{Euler Spiral}
+### Euler Spiral
 
 ```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 3, 8$.'}
 # generating euler spiral data
@@ -172,7 +153,7 @@ euler <- function(k) {
 euler(3); euler(10)
 ```
 
-\subsection{Helix}
+### Helix
 
 ```{r helix, fig.cap='Spherical PCA performed on a helix with $k = 3, 8$.'}
 # generating helix data
@@ -196,7 +177,7 @@ spiral <- function(k) {
 spiral(3); spiral(8)
 ```
 
-\subsection{Cylinder}
+### Cylinder
 
 ```{r cylinder, fig.cap='Spherical PCA performed on a cylinder with $k = 3, 8$.'}
 N <- 10^3
@@ -233,6 +214,4 @@ plot(vec_cylinder(1:10), main = "MSE", xlab = "k")
 
 We see that SPCA is not fully capable of handling a cylinder.
 
-\newpage
-
-\section{References}
+## References
