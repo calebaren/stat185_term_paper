@@ -1,0 +1,424 @@
+---
+title: "Final Exam"
+author: Caleb Ren
+date: "Due Tues, Dec. 17 at 11:59pm"
+
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{graphicx}
+  - \usepackage{enumerate}
+  - \usepackage{xcolor}
+output:
+  pdf_document:
+    fig_width: 5
+    fig_height: 3.5
+
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(echo = T, message = F, warning = F, cache = T,
+                      fig.align = 'center', fig.height = 4)
+```
+
+\newcommand{\noin}{\noindent}    
+\newcommand{\Var}{\text{Var}}    
+\newcommand{\Cov}{\text{Cov}}    
+
+\Large
+\noindent Name: **Caleb Ren** \hspace{0.05in} Harvard ID: **41291850**
+
+\normalsize
+\noindent This exam is open-notes and open-book (feel free to use the internet as well). You cannot discuss the contents of the exam with anyone except the teaching staff. There are 5 questions. Please submit your complete exam as a pdf as well as the source R-markdown (or R script) file on Canvas.  The exam is \textbf{Due at 11:59pm on Tuesday, Dec 17}.
+
+\normalsize
+
+\vspace{0.2in}
+
+\begin{large}
+
+\textit{I confirm that I have worked independently on this take-home exam, except for any assistance I may have received from the teaching staff with technical issues. All the work is my own, and I have not collaborated in any way with fellow students.}
+
+\vspace{0.5cm}
+
+\textbf{Signature (include an image of your signature):}\underline{ \hspace{2in}   }
+
+\end{large}
+
+\newpage
+
+#### Problem 1 [25 points total]
+Be sure to show your work to receive full credit (or will allow for more partial credit, like in the multiple choice problem).
+
+(a) A 95\% confidence interval for the mean, $\mu$, was calculated to be ($-10.2, 0.5$), and the 90\% confidence interval on the same set of data was calculated to be ($-9.4, -0.3$). Which one of the following would be a possible p-value for the hypotheses: $H_0 : \mu = 0 \text{ vs. } H_A: \mu \neq 0$?
+
+    (A) 0.0162 
+  
+    \fbox{(B) 0.0324}
+  
+    (C) 0.0648 
+  
+    (D) 0.1296
+    
+    ```{r 1a, include = F}
+    mu <- -4.85
+    x <- rnorm(20, mean = mu, sd = 8)
+    t.test(x, alternative = "two.sided", mu = 0, conf.level = 0.95)
+    t.test(x, alternative = "two.sided", mu = 0, conf.level = .90)
+    ```
+    
+    \color{blue}
+    Because the 95\% confidence interval for $\mu$ contains 0, we would fail to reject the null hypothesis with $\alpha = 0.05$, meaning the p-value is greater than 0.05. Because the 90\% confidence interval does not contain 0, we would reject the null hypothesis with $\alpha = 0.10$, meaning the p-value is less than 0.10. Therefore, the only viable option is to have a p-value of 0.03 of 0.0648.
+    \color{black}
+
+(b) A logistic regression model was fit to predict whether or not someone has ever smoked crack (1 = Yes, 0 = No) from marital status (1 = Married, 2 = Never Married, 3 = anything else: divorced, separated, or widowed) in the General Social Survey (GSS).  Relevant R output is shown below:
+
+    \begin{verbatim}
+    > table(gss$married)
+      1   2   3 
+    998 670 678 
+    > round(summary(glm(crack~married,data=gss))$coef,5)
+              Estimate Std. Error t value Pr(>|t|)
+    (Intercept)  0.02353    0.00963 2.44378  0.01466
+    married2     0.06911    0.01496 4.62029  0.00000
+    married3     0.05605    0.01546 3.62523  0.00030
+    \end{verbatim}
+    
+    i) Provide a 95\% confidence interval for the odds ratio of smoking crack comparing never married individuals to married individuals and briefly interpret this result.
+    
+    \color{blue}
+    The estimate $e^{\hat{\beta_1}}$ for the odds ratio of smoking crack comparing never married and married is equal to:
+  
+    $$
+    \widehat{OR} = \frac{\hat{p_1}/(1-\hat{p_1})}{\hat{p_2}/(1-\hat{p_2})} = e^{\hat{\beta_1}}
+    $$
+  
+    This quantity is equal to `r exp(0.06911)`. The 95\% confidence interval for the slope $\beta_1$ is given by $\hat{\beta_1} \pm 1.96\widehat{SE}_{\beta_1}$. A corresponding 95\% confidence interval for the odds ratio $e^{\beta_1}$ is given by $e^{\hat{\beta_1} \pm 1.96\widehat{SE}_{\beta_1}}$.
+    \color{black}
+  
+    ```{r 1b}
+    b_0 <- 0.02353; b_1 <- 0.06911; b_2 <- 0.05605
+    se <- 0.01496
+    c(exp(b_1 + qnorm(0.975) * se),
+      exp(b_1 - qnorm(0.975) * se))
+    ```
+
+    \color{blue}
+    The 95\% confidence interval for $e^{\hat{\beta_1}}$ is given by \boxed{(`r exp(b_1 + qnorm(0.975) * se)`, `r exp(b_1 - qnorm(0.975) * se)`)}.
+    \color{black}
+
+    ii) Determine the observed proportion and number of individuals that smoked crack in each of the 3 marital groups.
+  
+    ```{r, include = F}
+    xs <- c(rep("married", 998), 
+      rep("unmarried", 670), 
+      rep("other",678))
+    p0 <- 1/(1+exp(-b_0))
+    p1 <- 1/(exp(-(b_0+b_1)) + 1)
+    p2 <- 1/(exp(-(b_0+b_2)) + 1)
+    n0 <- round(p0 * 998)
+    n1 <- round(p1 * 670)
+    n2 <- round(p2 * 678)
+    ys <- c(rep(1, n0), rep(0, 998 - n0),
+            rep(1, n1), rep(0, 670 - n1),
+            rep(1, n2), rep(0, 678 - n2))
+    glm(ys ~ xs, family = "binomial")
+    ```
+
+    \color{blue}
+    The estimate of the intercept in the logistic model $\hat{\beta_0}$ is the log-odds of the proportion when `married2` and `married3` are equal to 0; in other words, when couples are unmarried.
+
+    $$
+    \begin{aligned}
+    \log\left(\frac{\hat{p_0}}{1-\hat{p_0}}\right) &= \hat{\beta_0} \\
+    \frac{\hat{p_0}}{1-\hat{p_0}} &= e^{\hat{\beta_0}} \\
+    \hat{p_0} &= \frac{1}{e^{-\hat{\beta_0}} + 1} \\
+    \hat{p_0} &= 0.5058822
+    \end{aligned}
+    $$
+
+    The estimate of the proportion of individuals who have smoked crack who are married is \boxed{`r 1 / (1 + exp(-0.02353))`}. The estimate of the number of people who have smoked crack who are married is \boxed{`r round(998 * p0)`}.
+    
+    For the remaining two marriage groups, the odds ratio is the ratio between the odds within the group and the reference group (in this case, the married group).
+    
+    $$
+    \begin{aligned}
+    e^{\hat{\beta}} &= \frac{\hat{p_i} / (1-\hat{p_i})}{\hat{p_0} / (1-\hat{p_0})} \\
+    e^{\hat{\beta_i}} &= \frac{\hat{p_i} / (1-\hat{p_i})}{e^{\hat{\beta_0}}} \\
+    e^{\hat{\beta_i} + \hat{\beta_0}} &= \frac{\hat{p_i}}{1-\hat{p_i}} \\
+    \hat{p_i} &= \frac{1}{1 + e^{-(\hat{\beta_i} + \hat{\beta_0})}}
+    \end{aligned}
+    $$
+
+    For those who are unmarried, the proportion of individuals who have smoked crack is \boxed{`r 1/(1 + exp(-(b_0 + b_1)))`}. The number of individuals who have smoked crack who are unmarried is \boxed{`r round(p1 * 670)`}. For those who are other (divorced, separated, or widowed), the proportion of individuals who have smoked crack is \boxed{`r  1/(1 + exp(-(b_0 + b_2)))`}. The number of individuals who have smoked crack who are unmarried is \boxed{`r round(p2 * 678)`}.
+    \color{black}
+
+(c) Briefly explain what the Normality assumption is in linear regression and briefly explain why this is the assumption that is typically of least concern.
+
+    \color{blue}
+    The Normality assumption in linear regression is that the sub-population of responses for each value of the explanatory variable are Normally distributed around the estimated mean conditional on the explanatory variable. In simpler terms, it means that we assume the errors are Normally distributed. This assumption may have importance when sample size is small, but in large samples, the Normality of error terms has little effect on the overall linear regression. In fact, this is stated in the Gauss-Markov Theorem in which the OLS estimator is the best linear unbiased estimator in terms of minimizing MSE as long as the errors are uncorrelated with mean 0 and constant variance. Notice that there is no statement of Normality in the GM theorem.
+    \color{black}
+
+(d) An observation is said to have **high leverage** if it is far away from the other observations in the predictor space.  Interpret what the effect this has on the standard OLS estimate for $\hat{\vec{\beta}} = (\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\vec{Y}$. Hint: think about the extreme situation for a simple model.
+
+    \color{blue}
+    Under OLS, the slope estimate $\hat{\beta_1}$ is given by $\hat{\vec{\beta_1}} = (\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\vec{Y}$. Therefore, if we were to generate a vector of predicted responses $\hat{\vec{Y}} = \mathbf{X}\hat{\vec{\beta_1}} = \mathbf{X}(\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\vec{Y}= \mathbf{H}\vec{Y}$, then $\mathbf{H}$ is the mapping from responses $\vec{Y}$ to predicted responses $\hat{\vec{Y}}$. 
+    
+    $$
+    \begin{aligned}
+    \vec{Y} &= \mathbf{X}\hat{\vec{\beta_1}} + \vec{\epsilon} \\
+    \vec{Y} - \hat{\vec{Y}} &= \vec{\epsilon} \\
+    \vec{Y} - \mathbf{H}\vec{Y} &= \vec{\epsilon} \\
+    (I - \mathbf{H})\vec{Y} &= \vec{\epsilon}
+    \end{aligned}
+    $$
+    
+    Let's examine what happens to each regression error $\epsilon_i$. Since we are in an OLS setting, we assume the errors to be uncorrelated with variance $\sigma^2$. Given that the matrix $I-\mathbf{H}$ is idempotent ($(I - \mathbf{H})^2 = I-\mathbf{H}$) and symmetric ($(I-\mathbf{H})^T = (I-\mathbf{H})$):
+    
+    $$
+    \begin{aligned}
+    \Var(\vec{\epsilon}) &= \Var((I-\mathbf{H})\vec{Y}) \\
+    &= (I-\mathbf{H})\Var(\vec{Y})(I-\mathbf{H})^T \\
+    &= \sigma^2(I-\mathbf{H})^T(I-\mathbf{H}) \\
+    &= \sigma^2(I-\mathbf{H})^2 \\
+    &= \sigma^2(I-\mathbf{H})
+    \Var(\epsilon_i) &= \sigma^2(I-\mathbf{H}_{i,i})
+    \end{aligned}
+    $$
+    
+    This result shows us that the variance of the $i$th error is determined and only determined by the magnitude of the $i$th diagonal element of the projection (or hat) matrix $\mathbf{H}$. Since the term in front of the hat matrix term is negative, as leverage increases (observed point is more of an outlier), we would expect lower variance (and thus less noise). As such, with high leverage observations, we would expect the $\hat{\vec{\beta_1}}$ slope estimate to shrink toward the higher leverage observations, since by minimizing residual error in OLS, we would inadvertantly shrink the slope estimate toward the higher leverage observations. One extreme example would be a dataset that is otherwise clustered around the origin with a single, high-leverage outlier at point $(100, 100)$. An OLS estimate would most likely pass very close to this point in order to minimize residual error, meaning that 
+    \color{black}
+
+(e) Let the sample size be large where the Central Limit Theorem (CLT) typically would hold ($n>200$).  In an ordinary least squares regression model, explain why high leverage observations are a concern when the normality assumption does not hold (be sure to mention what gets affected).
+
+\vspace{2cm}
+
+\newpage
+
+#### Problem 2 [35 points total]
+The dataset `mlb14_18.csv` has team measured statistics for the 30 major league baseball teams from 2014 until 2018, while `mlb19.csv` has the same variables, but for the 2019 season.  The variables measured in the training dataset are:
+
+  - **team**: a categorical variable with 30 categories to represent the 30 teams.  BOS is for the Boston Red Sox while NYY is for the New York Yankees, for example. 
+
+  - **year**: the year of the measurement, from 2014 until 2018.  Note: each team is measured exactly 5 times in the training data set (one measurement for each team for each year).
+
+  - **winpct**: the winning percentage for that team in that specific year.  By construction, these should be 0.500 on average within each year.  This is the response variable.
+  
+  - **payroll**: the total salary of players who were on the team on the first day of the season that year (measured in millions of dollars).
+
+  - **age**: the average age of the players on the first day of the season (weighted by how much they were projected to play).
+
+Note: you are required to treat the 2014-2018 dataset as training data (to fit all models), and the 2019 as testing data (when called for).
+
+(a) Fit an ordinary least squares (OLS) model to predict winpct from team (**lm1**).  Formally determine if there is evidence of a difference in winning percentage across teams.
+
+    ```{r 2a}
+    training <- read.csv("data/mlb14_18.csv"); testing <- read.csv("data/mlb19.csv")
+    lm1 <- lm(winpct ~ team, data = training)
+    summary(lm1)
+    anova(lm1)
+    ```
+    
+    \color{blue}
+    Categorical regression is equivalent to an ANOVA F-test. With 29 degrees of freedom, we obtain an F-statistic of 2.4477 which corresponds to a p-value of 0.0003809, meaning we reject the null hypothesis. We have evidence to believe that there is a statistically significant difference in winpct between teams.
+    \color{black}
+
+(b) Fit an OLS model to predict winpct from payroll (**lm2**).  Briefly interpret the estimate of $\beta_1$ (including statistical significance) and comment on the assumptions of this model.
+
+    ```{r 2b}
+    lm2 <- lm(winpct ~ payroll, data = training)
+    summary(lm2)
+    ```
+    
+    \color{blue}
+    Our null hypothesis is that there is no relationship between payroll and winpct and our alternative hypothesis is that there exists a relationship between payroll and winpct. The OLS estimator $\beta_1$ has a value of 0.0006081, a t-value of 5.659, and an associated p-value of 7.65e-08, which is less than our $\alpha$ value of 0.05, meaning we reject the null hypothesis and believe that a statistically significant relationship between payroll and winpct exists. The value of $\beta_1$ means that for every \$1 million increase in payroll for a given team, a team can expect on average a 0.06081\% increase in winpct. One standard deviation in payroll is around \$50 million, so in more meaningful terms, every \$50 million increase in payroll for a given team is expected to result in about a 3.04\% increase in winpct.
+    \color{black}
+
+(c) Fit an OLS model to predict winpct from payroll and team (**lm3**). Compare the estimated coefficient for payroll's association with the response to its counterpart in **lm2**, and explain what this indicates.
+
+    ```{r 2c}
+    lm3 <- lm(winpct ~ payroll + team, data = training)
+    summary(lm3)
+    ```
+
+(d) Fit an OLS model to predict winpct from payroll, team, and the interaction between the two (**lm4**).  Formally determine if the interaction term(s) provide significant explanatory power in this model.
+
+    ```{r 2d}
+    lm4 <- lm(winpct ~ payroll * team, data = training)
+    summary(lm4)
+    ```
+
+(e) What is the estimated relationship between winpct and payroll in **lm4** for the New York Yankees (NYY)?  What is it for the Boston Red Sox (BOS)?  Formally determine whether the slopes are significantly different for these two teams.
+
+(f) Fit an OLS model to predict winpct from payroll, team, year, and the interaction between team and year (**lm5**). Which teams are predicted to have the highest and lowest winning percentage in 2019 from this model?
+
+    ```{r 2f}
+    lm5 <- lm(winpct ~ payroll + (team * year), data = training)
+    y_hat <- predict(lm5, testing)
+    names(y_hat) <- levels(testing$team)
+    y_hat[which.max(y_hat)]; y_hat[which.min(y_hat)]
+    ```
+
+(g) Build a sequential variable selection model (using the combined forward and backward directions using the 'both' argument in R) to predict winpct where the starting model is **lm5**, the lower scope is the intercept-only model and the upper scope is the model with all 2-way interaction (and main effects) of all 4 predictors in the dataset.  Evaluate how this model performs in the 2019 data set via MSE.
+
+    ```{r 2g}
+    intercepts <- lm(winpct ~ 1, data = training)
+    interactions <- lm(winpct ~ . * ., data = training)
+    step_model <- step(lm5, 
+                       scope = list(lower = formula(intercepts), upper = formula(interactions)),
+                       direction = "both", trace = 0)
+    y_hat_step <- predict(step_model, testing)
+    paste("step model MSE:", round(mean((y_hat_step - testing$winpct)^2), 5))
+    paste("lm5 MSE:", round(mean((predict(lm5, testing) - testing$winpct)^2), 5))
+    paste("all two-way interactions MSE:", round(mean((predict(interactions, testing) - testing$winpct)^2), 5))
+    ```
+
+    \color{blue}
+    We see that the step model's test MSE is 0.0138, which is higher than that of the linear model using payroll and the interaction between year and team, but lower than the all 2-way effects model. The full interactions model most likely overfit the training data due to the high number of predictors (123!), which is roughly comparable to the number of observations in the dataset. The linear model using payroll, year, and team is more based on reality compared to the stepwise model.
+    \color{black}
+
+\vspace{2cm}
+
+#### Problem 3 [40 points total]
+
+(a) Fit a linear mixed effects model (LME) with random intercepts to predict winpct where the clusters are defined by the 30 different teams (always assume the teams define the clusters throughout this problem).  Call this model **lmer1**.  Compare the estimated coefficient for BOS to the appropriate OLS model from problem 2, and briefly explain why this result is the case.
+
+    ```{r 3a}
+    require(lme4)
+    lmer1 <- lmer(winpct ~ 1 + (1 | team), data = training)
+    summary(lmer1)
+    predict(lmer1, testing)[testing$team == "BOS"]
+    lm1$coefficients["teamBOS"]
+    ```
+
+(b) Fit an appropriate LME model (**lmer2**) to predict winpct from payroll where the overall effect of payroll is important and the average winpct of teams may vary as well as the effect of payroll may vary by team. Hint: you may have to re-center or scale payroll in order to get rid of collinearity with the intercept.  Briefly interpret what this model says about the overall average effect of payroll on winpct.
+
+(c) Write out the full model expression for the LME model **lmer2** in mathematical form (as seen in the notes for Lectures 23 and 24); be sure to define your variables. what are the estimates of the parameters in this model?
+
+(d) Formally test whether the effect of payroll is different across the 30 teams in **lmer2**.  Hint: you may have to fit another LME model for comparison.
+
+(e) Fit an LME model (**lmer3**) to predict winpct from payroll and year where the intercept is both fixed and random, payroll is treated as only a fixed effect, and year is treated as only a random effect.
+
+(f) Briefly justify the choice for modeling year as only a random effect and not a fixed effect.
+
+(g) Evaluate (via MSE) how **lmer1**, **lmer2**, and **lmer3** (as well as their OLS counterparts) perform on predicting the 2019 data.  Present the results in a well-formatted table that has 3 rows (to represent the 3 LME models) and 2 columns (one column for the LME models, and one column for the OLS counterparts).  Which of the 6 models performs best at predicting the out-of-sample data?  How do you know?
+
+(h) Compare each of the 3 LME models to their OLS counterparts in terms of MSE on test (within each of the 3 pairs, which perform best?) and briefly explain why this is the case for each. 
+
+\vspace{2cm}
+
+#### Problem 4 [30 points total]
+
+(a) Build a well-tuned ridge regression model (**ridge1**) to predict winpct from the 4 predictors in the training set along with their 2-way interaction effects.  Interpret the relationship between winpct and payroll in this model. Hint: a visual will help.
+
+    ```{r 4a}
+    require(glmnet)
+    
+    X <- model.matrix(interactions, data = training)
+    ridge1 <- cv.glmnet(X, y = training$winpct, alpha = 0)
+    par(mfrow = c(1, 2), mar = c(1, 1, 1, 1))
+    plot(ridge1); plot(ridge1$glmnet.fit, "lambda", label = T)
+    
+    ridge <- glmnet(X, y = training$winpct, alpha = 0, lambda = 10^(seq(-4, 4, by = 0.1)))
+    ```
+
+(b) Build a well-pruned decision tree model (**tree1**) to predict winpct from the 4 predictors in the training set.  Evaluate which of the predictors are most important within this model.
+
+    ```{r 4b}
+    require(rpart)
+    
+    tree1 <- rpart(winpct ~ ., data = training)
+    plot(tree1)
+    ```
+
+(c) Build a well-tuned bagging model (**bag1**) to predict winpct from payroll alone.  Interpret the relationship between winpct and payroll in this model.  Hint: a visual will help.
+
+(d) Build a well-tuned random forest model (**rf1**) to predict winpct from the 4 predictors in the training set. Evaluate which of the predictors are most important within this model.
+
+    ```{r 4d}
+    require(randomForest)
+    
+    rf1 <- randomForest(winpct ~ ., data = training)
+    ```
+
+(e) Which of the predictive models considered for these data is the best (between the 4 predictive models in this problem, the 6 considered in 3(g), and **lm6**)?  Briefly justify why this may be the case.
+
+(f) [**Up to 3 points Extra Credit**] Build a prediction model to predict winpct in 2019 that outperforms those considered above.  Only use the classes of models we have used in this class (no neural nets or boosted models, for example).  The process will be more important than the result.  Note: this is not worth very much extra credit.  
+
+\vspace{2cm}
+
+#### Problem 5 [20 points total]
+
+In class it was mentioned that a linear regression model can be used to model a binary outcome $Y$ variable, but the logistic regression model is preferred.  This simulation steps you through justification why that is the case, from an inferential perspective.
+
+Perform a simulation study (with 2,000 iterations for each of 4 conditions) where the data are generated from the following model:
+  
+  $$Y_i|X_i \sim \text{Bernoulli}\left(p_i=0.5+\delta\cdot(X_i-0.5)\right)$$
+  
+where $X_i$ represents a binary indicator of treatment: with exactly $n/2$ observations in each treatment group. Vary two different parameters (for a total of 4 conditions):
+  
+    i) Use two different treatment effects:  $\delta = 0$ and $\delta = 0.4$.
+  
+    ii) Use two difference sample sizes: $n = 50$ and $n = 200$.
+  
+    ```{r 5}
+    n <- 50
+    delta <- 0.4
+    
+    p5 <- function(n, delta) {
+      x <- c(rep(0, n/2), rep(1, n/2))
+      p <- c(0.5 + delta * (x - 0.5))
+      # n = 50 bernoulli trials
+      y <- rbinom(n = n, size = 1, p = p)
+      data <- data.frame(x = x, y = y)
+      
+      # linear model
+      lin_mod <- lm(y ~ x, data)
+      
+      # logistic model
+      log_mod <- glm(y ~ x, family = "binomial", data = data)
+      return(c(summary(lin_mod)$coefficients[2,4],
+               summary(log_mod)$coefficients[2,4]))
+    }
+    ```
+
+(a) In each iteration, analyze the data two different ways: using a linear regression model and separately a logistic regression model, both using the variable $X$ as the sole predictor of $Y$.  Use these to estimate the probability of rejecting the null hypothesis that $H_0: \beta_1=0$ in favor of $H_A: \beta_1 \neq 0$  in each of the two models.
+
+    ```{r 5a}
+    p5_p <- list('n:50, d:0' = replicate(2000, p5(50, 0)),
+                 'n:50, d:0.4' = replicate(2000, p5(50, 0.4)),
+                 'n:200, d:0' = replicate(2000, p5(200, 0)),
+                 'n:200, d:0.4' = replicate(2000, p5(200, 0.4)))
+    
+    p5_lst <- lapply(p5_p,
+                     function(x) c(mean(x[1,] < 0.05), 
+                                   mean(x[2,] < 0.05)))
+    print(p5_lst)
+    ```
+    
+    \color{blue}
+    For the $n=50$ case, we see that when $\delta=0$, there is low probability (`r p5_lst[[1]][1]` and `r p5_lst[[1]][2]`) that either test is able to pick up differences between both treatments. This is because sample size is comparatively low and there is no true separation in probability of the Bernoulli trials conditional on $X$ ($p=0.5$ marginally).
+    
+    For the $n=50, \delta=0.4$ case, both linear regression and logistic regression were more powerful (`r p5_lst[[2]][1]` and `r p5_lst[[2]][2]`, respectively). Linear regression slightly outperformed logistic regression in this circumstance, but this 
+    \color{black}
+
+(b) Interpret the results: how does sample size affect Type I error rates in the two models?  How does sample size affect statistical power for each?  
+
+    ```{r 5b}
+    sample_size_lin <- Vectorize(function(n) {
+      return(mean(replicate(1000, p5(n, 0.4))[1,] < 0.05))
+    })
+    sample_size_log <- Vectorize(function(n) {
+      return(mean(replicate(1000, p5(n, 0.4))[2,] < 0.05))
+    })
+    ns <- seq(20, 100, by = 4)
+    prob_lin <- sample_size_lin(ns)
+    prob_log <- sample_size_log(ns)
+    plot(ns, prob_lin, col = "blue", type = "l",
+         xlab = "Sample Size", ylab = "Power")
+    lines(ns, prob_log, col = "red")
+    legend("topleft", legend = c("linear regression", "logistic regression"),
+           fill = c("blue", "red"))
+    ```
+
+(c) Explain why Type I error rate is or is not at the nominal 0.05 level for the linear and logistic regression models for the two sample sizes (hint: think about which assumption(s) may be violated).  
