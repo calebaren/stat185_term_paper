@@ -19,6 +19,7 @@ set.seed(185)
 require(scatterplot3d)
 require(kableExtra)
 require(scales)
+require(ggplot2)
 source('spca_functions.R')
 ```
 \newpage
@@ -27,7 +28,9 @@ source('spca_functions.R')
 
 Data that exists in a high-dimensional ambient space may instead be considered to lie near a lower dimensional manifold (e.g. a circle in $\mathbb{R}^2$ that lies ambiently in $\mathbb{R}^3$ space). Many techniques are focused on reducing the ambient space to one closer to the intrinsic space such as clustering [@duda2000], data compression [@hurtado2012], and predictive modelling [@lee2008]. Many of these techniques that attempt to approximate manifolds embedded in a lower dimensional space are locally linear, use multiscale dictionaries, and as such struggle with areas with high Gaussian curvature. Additionally, many techniques that approximate local manifolds do not perform well with out-of-sample error as they do not reveal much information on the traits of the lower dimension manifold.
 
-A simple alternative that is able to handle curvature as well as out-of-sample error is to use pieces of spheres or *spherelets* to locally approximate the unknown subspace [@li2019].
+A simple alternative that is able to handle curvature as well as out-of-sample error is to use pieces of (hyper)spheres to locally approximate the unknown subspace [@li2019]. Data that is represented in higher dimension $\mathbb{R}^D$ can be projected down to a manifold in $\mathbb{R}^d$ consisting of a set of hyperspheres in $\mathbb{R}^d$. Ultimately, the algorithm partitions the dataset into $k$ subsets, each of which is fit with a submanifold $M_k \in \mathbb{R}^d$ with a corresponding projection map $\Psi_k: \mathbb{R}^D \rightarrow \mathbb{R}^d$. The final manifold $M$ and the final projection map $\Psi$ are the manifold and mapping from the data to the approximate manifold in $\mathbb{R}^d$, respectively. This method was first proposed by Li and Dunson, who termed the technique spherical PCA (SPCA) [@li2017], or *spherelets* for short.
+
+Spherelets rely on a projection mapping to the surface of a hypersphere as an underlying mechanism. As such, in simple cases of SPCA, closed form analytic solutions exist and can be seen as a generalization of PCA that is able to incorporate degrees of curvature. Spherical PCA in general does not have a closed-form solution due to the myriad ways in which a particular dataset can be partitioned and fit with sub-manifolds. Various algorithms exist to best partition the original dataset such as cover trees [@beygelzimer2006], METIS [@karypis1998], and iterated PCA [@szlam2009].
 
 Whereas principal component analysis (PCA) is an eigenvalue/eigenvector problem from an inherently *linear* dimension reduction problem, 
 
@@ -144,19 +147,21 @@ spca <- function(x, dimension) {
 
 \subsection{Euler Spiral}
 
-An Euler spiral is a special geometric figure in $\mathbb{R}^1$ that has a curvature that changes linearly with arc length. An Euler spiral can be parametrized as follows:
+The Euler spiral is a curve in $\mathbb{R}^1$ that has a curvature that changes linearly with arc length. In other words, $\kappa(s) = s$. The Euler spiral can be parametrized as follows:
 
 $$
 \begin{bmatrix}x(s) \\ y(s)\end{bmatrix} = 
 \begin{bmatrix}
 \displaystyle\int_0^s \cos(t^2) dt \\
 \displaystyle\int_0^s \sin(t^2) dt
-\end{bmatrix}
+\end{bmatrix} \hspace{0.1in} s \in [0, 4]
 $$
 
-```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 3, 8$.'}
+We use the Euler spiral as a demonstration to see how spherical PCA is able to handle regions with curvature.
+
+```{r Euler}
 # generating euler spiral data
-s <- seq(0, 3, by = 0.001)
+s <- seq(0, 4, by = 0.001)
 data <- matrix(rep(0, 2 * length(s)), ncol = 2)
 for (i in 1:length(s)) {
   data[i,1] <- integrate(function(t) sin(t^2),
@@ -166,6 +171,12 @@ for (i in 1:length(s)) {
                      lower = 0,
                      upper = s[i])$value
 }
+plot(data, type = "l", lwd = 4, xlab = "", ylab = "")
+```
+
+
+```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 3, 8$.'}
+
 
 par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
 euler <- function(k) {
@@ -192,12 +203,7 @@ data <- matrix(c(cos(s), sin(s), s), ncol = 3)
 # spherical pca on helix
 par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
 spiral <- function(k) {
-  d <- SPCA_Manifold_approx(x = data,
-                            y = data, 
-                            d = 1, 
-                            epsilon = -5, 
-                            epsilon2 = 0.0001, 
-                            N.min = 20)
+  d <- partition(data, k)
   spca_d <- lapply(d, FUN = function(x) spca(x, 1))
   rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
   spl <- scatterplot3d(data, type = "l", lwd = 4,
