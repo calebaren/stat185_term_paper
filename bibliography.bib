@@ -7,6 +7,15 @@
 	year = {2019}
 }
 
+@article{geodesic,
+	abstract = {Many statistical and machine learning approaches rely on pairwise distances between data points. The choice of distance metric has a fundamental impact on performance of these procedures, raising questions about how to appropriately calculate distances. When data points are real-valued vectors, by far the most common choice is the Euclidean distance. This article is focused on the problem of how to better calculate distances taking into account the intrinsic geometry of the data, assuming data are concentrated near an unknown subspace or manifold. The appropriate geometric distance corresponds to the length of the shortest path along the manifold, which is the geodesic distance. When the manifold is unknown, it is challenging to accurately approximate the geodesic distance. Current algorithms are either highly complex, and hence often impractical to implement, or based on simple local linear approximations and shortest path algorithms that may have inadequate accuracy. We propose a simple and general alternative, which uses pieces of spheres, or spherelets, to locally approximate the unknown subspace and thereby estimate the geodesic distance through paths over spheres. Theory is developed showing lower error for many manifolds. This conclusion is supported through multiple simulation examples and applications to real data sets.},
+	author = {Didong Li and David B Dunson},
+	journal = {arXiv},
+	date = {2019-06-29},
+	title = {{Geodesic Distance Estimation with Spherelets}},
+	year = {2019}
+}
+
 @article{li2017,
 	abstract = {Data lying in a high-dimensional ambient space are commonly thought to have a much lower intrinsic dimension. In particular, the data may be concentrated near a lower dimensional subspace or manifold. There is an immense literature focused on approximating the unknown subspace, and in exploiting such approximations in clustering, data compression, and build-ing of predictive models. Most of the literature relies on approximating subspaces using a locally linear, and potentially multiscale, dictionary. In this article, we propose a simple and general alternative, which instead uses pieces of spheres, or spherelets, to locally approximate the unknown subspace. Building on this idea, we develop a simple and computationally efficient algorithm for subspace learning and clustering. Results relative to state-of-the-art competitors show dramatic gains in ability to accurately approximate the subspace with orders of magnitude fewer components. This leads to substantial gains in data compressibility, few clusters and hence better interpretability, and much lower MSE based on smallt o moderate sample sizes. Basic theory on approximation accuracy is presented, and the methods are applied to multiple examples},
 	author = {Didong Li and David B Dunson},
@@ -18,7 +27,7 @@
 }
 
 @online{github,
-	author = {mmukhopadhyay},
+	author = {Minerva Mukhopadhyay},
 	title = {{Efficient Manifold Learning Using Spherelets}},
 	organization = {Github},
 	date = {2019-04-09}

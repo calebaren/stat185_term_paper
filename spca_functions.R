@@ -99,7 +99,7 @@ SS_calc=function(X,mu,c,V,r,d,c.d)
 } 
 
 ##################################################################################################################################
-SPCA_Manifold_approx=function(x,y,d,epsilon,epsilon2,N.min)
+SPCA_Manifold_approx=function(x,y,d,epsilon,epsilon2,N.min, verbose = F)
 {
   
   n=nrow(x); p=ncol(x); nt=nrow(y);
@@ -148,7 +148,7 @@ SPCA_Manifold_approx=function(x,y,d,epsilon,epsilon2,N.min)
   
   while((pc.error>epsilon)&(max.cls>N.min))
   {
-    print(k)
+    if(verbose) print(k)
     # Train
     Lev_INDX=levels(as.factor(INDX))
     L=length(Lev_INDX)
@@ -358,12 +358,12 @@ SPCA_Manifold_approx=function(x,y,d,epsilon,epsilon2,N.min)
     {
       if(n.part[k-1]==n.part[k-2])
       {
-        print("Further partitions are not possible!")
+        if (verbose) print("Further partitions are not possible!")
         break
       }
       if((abs(mse[k-2]-mse[k-1])<epsilon2))
       {
-        print("There is little decrease in errors over further partitions!")
+        if (verbose) print("There is little decrease in errors over further partitions!")
         break
       }
     }
@@ -373,7 +373,7 @@ SPCA_Manifold_approx=function(x,y,d,epsilon,epsilon2,N.min)
   SP1=sp.err; NP1=log10(n.part1)
   Result=cbind(NP1,SP1)
   colnames(Result)=c("log10(#partitions)","log10(MSE)")
-  print(Result)
+  if (verbose) print(Result)
   
   return_res=list(y.hatD.list,Result)
 }
