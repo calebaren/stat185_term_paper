@@ -12,16 +12,7 @@ output:
 bibliography: bibliography.bib
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, cache=T, message=F, warning=F,
-                      fig.height=4, fig.align='center', fig.pos="H")
-set.seed(185)
-require(scatterplot3d)
-require(kableExtra)
-require(scales)
-require(ggplot2)
-source('spca_functions.R')
-```
+
 \newpage
 
 \section{Introduction}
@@ -179,31 +170,7 @@ The algorithm is as follows:
 
 To generate numerical examples, I used the `SPCA` and `SS_calc` functions written by co-author Minerva Mukhopadhyay [@github]. The `SPCA` function takes in a matrix of $N$ observations $\vec{x}_i \in \mathbb{R}^{D}, i \in 1, \dots, N$ and returns the error given by spherical and local PCA (`SS` and `SS_new`), as well as the projected values `Y_D`.
 
-```{r example_setup}
 
-partition <- function(data, k) {
-  # partitions data
-  bin <- floor(nrow(data) / k)
-  sto <- vector(mode = "list", length = k)
-  for (i in 1:k) {
-    if (i == k) {
-      sto[[i]] <- data[(1 + (i - 1) * bin) : nrow(data),]
-    }
-    else {
-      sto[[i]] <- data[(1+ (i-1) * bin):(i*bin),]
-    }
-  }
-  return(sto)
-}
-
-spca <- function(x, dimension) {
-  out <- SPCA(x, dimension)
-  ss_out <- SS_calc(X = x, mu = colMeans(x), c = out$c,
-                    V = out$V, r = out$r, d = dimension, 
-                    c.d = out$c_d)
-  return(ss_out)
-}
-```
 
 \subsection{Euler Spiral}
 
@@ -219,96 +186,49 @@ $$
 
 We use the Euler spiral as a demonstration to see how spherical PCA is able to handle regions with curvature.
 
-```{r Euler}
-# generating euler spiral data
-s <- seq(0, 4, by = 0.001)
-data <- matrix(rep(0, 2 * length(s)), ncol = 2)
-for (i in 1:length(s)) {
-  data[i,1] <- integrate(function(t) sin(t^2),
-                     lower = 0,
-                     upper = s[i])$value
-  data[i,2] <- integrate(function(t) cos(t^2),
-                     lower = 0,
-                     upper = s[i])$value
-}
-plot(data, type = "l", lwd = 4, xlab = "", ylab = "")
-```
+
+\begin{center}\includegraphics{Term_paper_files/figure-latex/Euler-1} \end{center}
 
 
-```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 3, 8$.'}
-par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
-euler <- function(k) {
-  d <- partition(data, k)
-  spca_d <- lapply(d, FUN = function(x) spca(x, 1))
-  rainbow_cols <- alpha(sample(rainbow(k)), 0.08)
-  plot(data, type = "l", lwd = 4,
-       xlab = "", ylab = "")
-  for (i in 1:k) {
-    points(spca_d[[i]]$Y_D, col = rainbow_cols[i], pch = 19, cex = 0.6)
-  }
+\begin{figure}[H]
+
+{\centering \includegraphics{Term_paper_files/figure-latex/euler-1} 
+
 }
 
-euler(3); euler(10)
-```
+\caption{Spherical PCA performed on an Euler spiral with $k = 3, 8$.}\label{fig:euler}
+\end{figure}
 
 \subsection{Helix}
 
-```{r helix, fig.cap='Spherical PCA performed on a helix with $k = 3, 8$.'}
-# generating helix data
-s <- seq(0, 6*pi, by=0.1)
-data <- matrix(c(cos(s), sin(s), s), ncol = 3)
+\begin{figure}[H]
 
-# spherical pca on helix
-par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
-spiral <- function(k) {
-  d <- partition(data, k)
-  spca_d <- lapply(d, FUN = function(x) spca(x, 1))
-  rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
-  spl <- scatterplot3d(data, type = "l", lwd = 4,
-                       xlab = "", ylab = "", zlab = "")
-  for (i in 1:k) {
-    spl$points3d(spca_d[[i]]$Y_D, 
-                 col = rainbow_cols[i], pch = 19, cex = 0.6)
-  }
+{\centering \includegraphics{Term_paper_files/figure-latex/helix-1} 
+
 }
 
-spiral(3); spiral(8)
-```
+\caption{Spherical PCA performed on a helix with $k = 3, 8$.}\label{fig:helix}
+\end{figure}
 
 \subsection{Cylinder}
 
-```{r cylinder, fig.cap='Spherical PCA performed on a cylinder with $k = 3, 8$.'}
-N <- 10^3
-theta <- runif(N, 0, 2*pi)
-data <- matrix(c(cos(theta), sin(theta), sort(runif(N, 0, 5))), 
-               ncol = 3)
 
-# spherical pca on cylinder
-par(mfrow = c(1, 3), mar = c(1, 1, 1, 1))
-cylinder <- function(k, new.plot = F) {
-  d <- partition(data, k)
-  spca_d <- lapply(d, FUN = function(x) spca(x, 2))
-  rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
-  if (new.plot) {
-    spl <- scatterplot3d(data, color = rgb(0, 0, 0, 0.5),
-                       xlab = "", ylab = "", zlab = "", 
-                       mar = c(1, 1, 1, 1))
-  }
-  mse <- c()
-  for (i in 1:k) {
-    if (new.plot) {
-      spl$points3d(spca_d[[i]]$Y_D, 
-                 col = rainbow_cols[i], pch = 19, cex = 0.2)
-    }
-    mse <- c(mse, (spca_d[[i]]$Y_D - d[[i]])^2)
-  }
-  return(mean(mse))
+```
+## [1] 0.00269493
+```
+
+```
+## [1] 7.353559e-05
+```
+
+\begin{figure}[H]
+
+{\centering \includegraphics{Term_paper_files/figure-latex/cylinder-1} 
+
 }
 
-cylinder(3, new.plot = T); cylinder(8, new.plot = T)
-vec_cylinder <- Vectorize(cylinder)
-plot(vec_cylinder(1:10), main = "MSE", xlab = "k")
-```
+\caption{Spherical PCA performed on a cylinder with $k = 3, 8$.}\label{fig:cylinder}
+\end{figure}
 
 We see that SPCA is not fully capable of handling a cylinder.
 
