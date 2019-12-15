@@ -1,39 +1,210 @@
 ---
 title: "Spherelets"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 subtitle: "Stat 185 Term Paper"
 author: "Caleb Ren"
-date: "December 14, 2019"
-geometry: margin = 2cm
 output: 
   html_document:
     fig_caption: yes
-    theme: cosmo
+    theme: paper
 bibliography: bibliography.bib
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, cache=T, message=F, warning=F,
-                      fig.height=4, fig.align='center', fig.pos="H")
+                      fig.height=3, fig.align='center', fig.pos="H")
 set.seed(185)
 require(scatterplot3d)
 require(kableExtra)
 require(scales)
 source('spca_functions.R')
+load('digits.Rdata')
 ```
 
 # {.tabset .tabset-pills .tabset-fade}
 
 ## Introduction
 
-Whereas principal component analysis (PCA) is an eigenvalue/eigenvector problem from an inherently *linear* dimension reduction problem, [@li2017]
+Data that exists in a high-dimensional ambient space may instead be considered to lie near a lower dimensional manifold (e.g. a circle in $\mathbb{R}^2$ that lies ambiently in $\mathbb{R}^3$ space). Many techniques are focused on reducing the ambient space to one closer to the intrinsic space such as clustering [@duda2000], data compression [@hurtado2012], and predictive modelling [@lee2008]. Many of these techniques that attempt to approximate manifolds embedded in a lower dimensional space are locally linear, use multiscale dictionaries, and as such struggle with areas with high Gaussian curvature. Additionally, many techniques that approximate local manifolds do not perform well with out-of-sample error as they do not reveal much information on the traits of the lower dimension manifold.
+
+A simple alternative that is able to handle curvature as well as out-of-sample error is to use pieces of (hyper)spheres to locally approximate the unknown subspace [@li2019]. This method was first proposed by Li and Dunson, who termed the technique spherical PCA (SPCA) [@li2017], or *spherelets* for short. Whereas principal component analysis (PCA) is an eigenvalue/eigenvector problem from an inherently *linear* dimension reduction problem, spherelets rely on projection mappings to the surfaces of a hypersphere as an underlying mechanism. As such, in simple cases of SPCA, closed form analytic solutions exist and can be seen as a generalization of PCA that is able to incorporate degrees of curvature. Spherical PCA in general does not have a closed-form solution due to the myriad ways in which a particular dataset can be partitioned and fit with sub-manifolds. Various algorithms exist to best partition the original dataset such as cover trees [@beygelzimer2006], METIS [@karypis1998], and iterated PCA [@szlam2009]. The type of partitioning done is context-dependent and multiple types of subsetting can be done to cross-validated to reduce test MSE. As examples, we will examine two types of partitioning: naively---by splitting the dataset into equal-sized clusters---and via partioning by iterated PCA [@li2019].
+
+Data that is represented in higher dimension $\mathbb{R}^D$ can be projected down to a manifold in $\mathbb{R}^d$ consisting of a set of spherelets in $\mathbb{R}^d$. Ultimately, the algorithm partitions the dataset into $k$ subsets, each of which is fit with a submanifold $M_k \in \mathbb{R}^d$ with a corresponding projection map $\Psi_k: \mathbb{R}^D \rightarrow \mathbb{R}^d$. Given a dataset $\mathbf{X} \in \mathbb{R}^D$, the spherical PCA algorithm returns manifold $M$ and the projection map $\Psi$, which are the manifold and mapping from the data to the approximate manifold in $\mathbb{R}^d$, respectively.
+
+Manifold approximation for model-building is one useful application of spherelets but the technique can be used for other purposes. Spherical PCA can also be used to denoise manifolds and generate visualizations of data in higher dimensions. Spherelets have been shown to outperform competiting denoising algorithms like Gaussian Blurring Mean Shift (GBMS), Manifold Blurring Mean Shift (MBMS), and Local Tangent Projection (LTP). Visualization techniques that preserve local geometry like Isomap, Locally Linear Embedding (LLE), and t-distributed Stochastic Neighborhood Embedding (t-SNE) can also be modified to incorporate spherical geometry using the same projection to spherical affine subspace, as in the original spherelets paper [@li2019].
+
+In spherical PCA, a point $\vec{y}_i$ is projected down to a sphere $S_V(c, r)$, where $c$ is the center of the sphere, $r$ is the radius, and $V$ specifies the subspace on which the sphere lies. The optimal estimates for the sphere $S_{\hat{V}}(\hat{c}, \hat{r})$ are given by:
+
+$$
+\begin{gathered}
+\hat{V} = (\vec{v}_1, \dots, \vec{v}_{d + 1}) \\
+\hat{c} = -\frac{\vec{\eta}^*}{2}  \\
+\hat{r} = \frac{1}{N} \sum_{k = 1}^N \left\|\vec{z}_i - \hat{c} \right\|
+\end{gathered}
+$$
+
+Where $\vec{v}_i$ is the $i$th eigenvector of the covariance matrix times  $\mathbf{\Sigma}$, $\vec{z}_i$ is the the projected data down to the subspace and $\vec{\eta}^*$ is a vector based on the entire projected dataset $\mathbf{Z}$. After an introduction into notation of spherical PCA, I will introduce relevant theory, including the Main Theorem that undergirds spherical PCA in the following section, as well as assumptions made. I will discuss strengths and weaknesses of the algorithm in Section 3, and then provide numerical examples demonstrating areas in which spherelets perform well and where the algorithm struggles in Section 4.
 
 ## Method
 
+### Theory
+
+#### Covering Number
+
+The Main Theorem underlying spherical PCA asserts that the covering number of spherelets is lower than that of an analogous PCA method using hyperplanes. Given a dictionary of basis functions $\mathcal{B}$, the Main Theorem shows a that the number of individual "pieces" of spheres to approximate a manifold within error threshold $\epsilon > 0$ is lower than that of a purely hyperplane method [@li2019]. If $M$ is a $d$-dimensional, compact, $C^3$-smooth Riemannian manifold, the covering number $\mathcal{N}_{\mathcal{B}}(\epsilon, M)$ is defined as:
+
+$$
+N_{\mathcal{B}}(\epsilon, M) := \inf_{N} \left\{N : \exists \{C_k, \Psi_k, B_k \}_{k = 1}^K \, s.t. \, \|x - \Psi(x) \| \le \epsilon, \, \forall x \in M \right\}
+$$
+
+Here, $C_k$ defines the $k$th partition of ambient space $\mathbb{R}^D$, $B_k$ is a local basis within the dictionary of basis functions $\mathcal{B}$. We have previously defined $\Psi$ to be the global projection, so $\Psi_k$ is the local projection within the $k$th partition and $\Psi = \sum_{k=1}^K 1_{x \in C_k}\Psi_k$ defines the global projection as a combination of local projections.
+
+This definition of covering number holds that there exists some number $N$ such that we can fit a sphere with error lower than threshold $\epsilon$. In the context of spherical PCA, we have two general choices of $\mathcal{B}$: $\mathcal{S}$---the dictionary of basis functions that use a spherical affine space---and $\mathcal{H}$---the dictionary of basis functions that use hyperplanes. Note that if we allow the construction of spheres with infinite radius, we obtain manifolds with $\kappa = 0$, which are hyperplanes! Thus, $\mathcal{H} \subset \mathcal{S}$. As such, we arrive at the inequality:
+
+$$
+N_{\mathcal{S}}(\epsilon, M) \le N_{\mathcal{H}}(\epsilon, M)
+$$
+
+Spherical PCA asserts that in the worst case with totally linear manifolds, the algorithm will perform as poorly as local PCA that uses hyperplanes instead of sections of spheres as its dictionary of basis functions.
+
+#### Main Theorem
+
+We can also achieve a tighter upper bound than the above inequality. Given a manifold $M$ that satisfies the conditions listed above ($d$-dimensional with $d << D$, $C^3$-smooth, compact, Riemannian), we define additional notation:
+
+  * $K(p,\vec{v})$ is a function that assigns a curvature of the geodesic on $M$ starting at arbitrary point $p$ with direction $\vec{v}$,
+  
+  * $K^*$ is the maximum curvature defined above with $K^*:= \sup_{(p,\vec{v}) \in UTM} K(p, \vec{v}) < \infty$,
+  
+  * Similarly, if $T(p,\vec{v})$ defines the rate of change of curvature, then $T^* := \sup_{(p, \vec{v}) \in UTM} T(p, \vec{v})$ defines the maximum rate of change in curvature,
+  
+  * $UTM$ as encountered above  defines the unit sphere bundle over $M$ and $UT_pM$ defines the unit sphere bundle centered at point $p \in M$,
+  
+  * $F_\epsilon$ is the set of $\epsilon$-spherical points on $M$ with difference in maximum and minimum curvature under a threshold level parametrized by $\epsilon$:
+
+$$
+\begin{gathered}
+F_\epsilon := \left\{ p \in M : \sup_{\vec{v} \in UT_pM} K(p,\vec{v}) - \inf_{\vec{v}\in UT_pM} K(p,\vec{v}) \le \left(\frac{2\epsilon}{K^*}\right)^{1/2} \right\}
+\end{gathered}
+$$
+
+  * $B(p, \epsilon)$ is a ball with radius $\epsilon$ and center $p$.
+
+That is to say, the spherical submanifold $M_\epsilon$ of $M$ for a given error $\epsilon$ is the union of all the balls centered at points in $F_\epsilon$, or
+  
+$$
+M_\epsilon := \bigcup_{p \in F_\epsilon} B\left(p, \left(\frac{6\epsilon}{3 + T}\right)^{1/3}\right)
+$$
+
+We have therefore defined a way to define a spherical submanifold $M_\epsilon$ of base manifold $M$ given an error level $\epsilon$. We define $V_\epsilon$ as the volume contained within this spherical submanifold $M_\epsilon$.
+
+We have now defined the notation necessary for the main theorem, which contrasts covering numbers for hyperplanes and sections of spheres.
+
+**Main Theorem**. [@li2019] For any $\epsilon > 0$ and compact $C^3$ $d$-dimensional Riemannian manifold $M$,
+
+$$
+\begin{gathered}
+N_{\mathcal{H}} \lesssim V\left(\frac{2\epsilon}{K^*}\right)^{-d/2} \\
+N_{\mathcal{S}} \lesssim V_\epsilon\left(\frac{6\epsilon}{3 + T^*}\right)^{-d/3} + (V - V_\epsilon)\left(\frac{2\epsilon}{K^*}\right)^{-d/2}
+\end{gathered}
+$$
+
+A key result from the Main Theorem is that the covering number of spherelets has a lower upper bound when the difference between $V$ and $V_\epsilon$ is small. In the case when $V - V_\epsilon \rightarrow 0$, the second term in the bound for $N_\mathcal{S}$ shrinks to 0 and the first term dominates, which grows at $O(c^{-n/3})$, which outperforms the $O(c^{-n/2})$ that $N_\mathcal{H}$ grows at.
+
+In the case when $V_\epsilon \rightarrow 0$ (when the degree of curvature is low so the spherical submanifold is unable to cover much of the underlying manifold), spherical PCA converges to hyperplane PCA.
+
+According to Li and Dunson, the bounds to the Main Theorem are tight, implying that spherelets often require many fewer pieces than locally linear dictionaries and approximate $M$ for a given error level $\epsilon$. Spherelets provide an exceptionally good approximation of $M$ when there the curvature across the manifold stays in a relatively narrow range, as these would require many more parameters in locally linear PCA to approximate. As such, spherelets provide a more robust way of fitting datasets that have intrinsic curvature in a lower $d$-dimensional manifold compared to hyperplane PCA.
+
 ### Spherical PCA
 
-Given a set of data $\vec{x}_1, \dots, \vec{x}_N \in \mathbb{R}^D$, we find the best approximating sphere $S_{V}(c,r)$, where $c$ is the center, $r$ is the radius, and $V \in \mathbb{R}^{(d+1) \times (d+1)}$ is the $(d+1)$th dimensional affine subspace the sphere lives on. For any point in the dataset $\vec{x}_i$, the closest point $\vec{y}_i$ lying on the sphere $S_V(c,r)$ is the point that minimizes Euclidean distance $\|x,y\|^2$ between $x$ and $y$. The optimal subspace $V$ is given by $\hat{V} = (\vec{v}_1, \dots, \vec{v}_{d+1})$, where $\vec{v}_i, i \in \{1,\dots,d+1\}$ is the $i$th eigenvector ranked in descending order of $(\mathbf{X} - 1_N\bar{\mathbf{X}})^T(\mathbf{X} - 1_N\bar{\mathbf{X}})$.
+#### Notation
 
-If $\vec{z}_i = \bar{\mathbf{X}} + \hat{V}\hat{V}^T(\vec{x}_i - \bar{\mathbf{X}})$ are a change of basis to affine subspace $V$, then it can be shown that the minimizing pair $(\vec{\eta}^\star, \vec{\xi}^\star)$ of loss function $g(\vec{\eta}, \vec{\xi}) = \sum_{k = 1}^N(\vec{z}_i^T \vec{z}_i + \vec{\eta}^T \vec{x}_i + \vec{\xi})^2$ is:
+Assume we have the $N \times D$ data matrix $\mathbf{X}$, with $N$ observations and $D$ variable where $x_{i,j}$ represents the $i$th observation of the $j$th variable:
+
+$$
+\mathbf{X} = \begin{bmatrix}
+x_{1,1} & \dots & x_{1,D} \\
+\vdots & \ddots & \vdots \\
+x_{i,1} & \dots & x_{i,D} \\
+\vdots & \ddots & \vdots \\
+x_{N,1} & \dots & x_{N,D}
+\end{bmatrix}
+$$
+
+As in linear PCA, a more succinct way to represent this matrix is to write:
+
+$$
+\mathbf{X} = \begin{bmatrix} \vec{x}_1^T \\ \vdots \\ \vec{x}_i
+^T\\ \vdots \\ \vec{x}_N^T \end{bmatrix}
+$$
+
+We will once again treat $\vec{x}_1, \dots, \vec{x}_N$ as i.i.d. samples of a random vector in $\mathbb{R}^D$ from the same underlying distribution $F$ for which $E_{x \sim F} \|x\|^2 < \infty$ to assure that the mean and covariance of the data matrix are well-deefined. We use:
+
+$$
+\overline{x} = \frac{1}{N} \sum_{i = 1}^N \vec{x}_i
+$$
+
+to denote the sample mean of $\vec{x}$. To denote the covariance operator, we use:
+
+$$
+\mathbf{\Sigma}_x = \frac{1}{N} \sum_{i = 1}^N (\vec{x}_i - \overline{x})(\vec{x}_i - \overline{x})^T = \frac{1}{N} \left(\sum_{i = 1}^N \vec{x}_i \vec{x}_i^T \right) - \overline{x}\overline{x}^T = \frac{1}{N} \mathbf{X}^T \mathbf{X} - \overline{x} \overline{x}^T
+$$
+
+This covariance operator will come into use later on. Additional notation includes:
+
+  * $1_N$ is the column vector of all ones with length $N$ (i.e. $1_N \in \mathbb{R}^N$)
+  
+  * $\| \vec{z} \|$ denotes the Euclidean norm (i.e. for $\vec{z} \in \mathbb{R}^d, \|\vec{z}\| = \left(\sum_{i = 1}^{d} z_i ^2 \right)^{1/2} = \sqrt{\vec{z}^T \vec{z}}$)
+  
+  * $\Psi: \mathbb{R}^D \rightarrow \mathbb{R}^{d+1}$ is a projection map from space $\mathbb{R}^D$ to $\mathbb{R}^{d+1}$.
+    Note: $\Psi$ maps from $\mathbb{R}^D$ to $\mathbb{R}^{d+1}$ rather than $\mathbb{R}^{d}$ because the projected points lie on an affine subspace with one fewer degree of freedom than the manifold. One example is fitting a curve in $\mathbf{R}^2$ with sections of 2-dimensional circles; while circles are 2D, the projected points only live along the edge of the circle. As such, we include on extra dimension in our projection map to account for the extra degree of freedom.
+    
+  * $d^2(\cdot, \cdot)$ is the distance operator between two points. Note that $d^2(x, y)$ is equivalent to $\sqrt{\| x - y \|}$.
+
+#### Assumptions
+
+There are three main assumptions made by Li and Dunson:
+
+  * **Distributional Assumption**. The data matrix $\mathbf{X} \in \mathbb{R}^{N \times D}$ consists of a transformation $V^* \Lambda^{*\frac{1}{2}} \mathbf{Z}$ where $\mathbf{Z} \in \mathbb{R}^{N \times D}$ is a data matrix consisting of i.i.d $z_i$ non-degenerate random variables.
+  * **Moment Assumption**. For the underlying random variables $z_{i}$, $E(z_{i}) = 0$, $E(z_i^2) = 1$, and $E(z_i^6) < \infty$. We can choose an affine transformation $V^*$ such that the underlying random variables satisfy the first two moment assumptions. A similar assumption is considered in Lee et al. that uses bounded fourth moments instead to prove convergence in high dimensional PCA [@lee2010].
+  * **Spike Population Model Assumption**. If $\lambda_1, \lambda_2, \dots, \lambda_D$ are the ordered eigenvalues of $\Lambda^*$ as similar to a PCA setting, then there exists an integer $m > d$ such that $\lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_m \ge lambda_{m+1} = \dots = \lambda_D = 1$.
+  
+The consequence of these assumptions is that we have a theoretical guarantee that the estimate projection $\hat{\Psi}$ converges in probability to $\Psi^*$. In other words:
+
+$$
+\lim_{n \rightarrow \infty} P(\sup_{x \in M} \| \hat{\Psi}(x) - \Psi^*(x) \| > \epsilon) = 0, \, \forall\epsilon <0
+$$
+
+\subsubsection{Estimation}
+
+Given a set of data $\vec{x}_1, \dots, \vec{x}_N \in \mathbb{R}^D$ organized into data matrix $\mathbf{X}$, spherical PCA estimates the best approximating sphere $S_{V}(c,r)$, where $c$ is the center, $r$ is the radius, and $V \in \mathbb{R}^{(d+1) \times (d+1)}$ is the $(d+1)$th dimensional affine subspace the sphere lives on. 
+
+For observation $\vec{x}_i$, the closest point $\vec{y}_i$ lying on the sphere $S_V(c,r)$ is the point that minimizes Euclidean distance $d^2(\vec{x}_i, \vec{y}_i)$ between $\vec{x}$ and $\vec{y}$. 
+
+Continuing the convention that $\Psi$ is an orthogonal projection from $R^D$ to the affine subspace given by c + V, then $\Psi$ is given by:
+
+$$
+\hat{\Psi}(\vec{x}_i) = \hat{c} + \frac{\hat{r}}{\| \hat{V}\hat{V}^T (\vec{x}_i - \hat{c}) \|}\hat{V}\hat{V}^T(\vec{x}_i - \hat{c})
+$$
+
+Note that $\vec{x} - \Psi_{V,c}(\vec{x}) \perp \Psi_{V,c}(\vec{x}) - \vec{y}$ since $\Psi$ is an orthogonal projection.
+
+The optimal subspace $V$ is given by $\hat{V} = (\vec{v}_1, \dots, \vec{v}_{d+1})$, where $\vec{v}_i, i \in \{1,\dots,d+1\}$ is the $i$th eigenvector ranked in descending order of $(\mathbf{X} - 1_N\bar{\mathbf{X}})^T(\mathbf{X} - 1_N\bar{\mathbf{X}})$. This is a result taken from linear PCA, where we eigendecomposed the covariance matrix $\Sigma$ to obtain the decreasing eigenvalues and eigenvectors to obtain the principal component scores and loadings. In fact, the matrix given by $(\mathbf{X} - 1_N\bar{\mathbf{X}})^T(\mathbf{X} - 1_N\bar{\mathbf{X}})$ is equivalent to:
+
+$$
+\begin{aligned}
+(\mathbf{X} - 1_N\bar{\mathbf{X}})^T(\mathbf{X} - 1_N\bar{\mathbf{X}})&= \mathbf{X}^T \mathbf{X} - \bar{\mathbf{X}}^T1_N^T\mathbf{X} - \mathbf{X}^T 1_N \bar{\mathbf{X}} + \bar{\mathbf{X}}^T 1_N^T 1_N \bar{\mathbf{X}} \\
+&= \mathbf{X}^T \mathbf{X} - N \overline{x} \overline{x}^T \\
+&= N \cdot \Sigma_X
+\end{aligned}
+$$
+
+In other words, the first step of spherical PCA is to eigendecompose the scaled covariance matrix $\Sigma_X$! This is where the "PCA" aspect of spherical PCA arises.
+
+If $\vec{z}_i = \bar{\mathbf{X}} + \hat{V}\hat{V}^T(\vec{x}_i - \bar{\mathbf{X}})$ are a change of basis to affine subspace $V$, then it can be shown that the minimizing pair $(\vec{\eta}^*, \vec{\xi}^*)$ of loss function $g(\vec{\eta}, \vec{\xi}) = \sum_{k = 1}^N(\vec{z}_i^T \vec{z}_i + \vec{\eta}^T \vec{x}_i + \vec{\xi})^2$ is:
 
 $$
 \begin{gathered}
@@ -45,18 +216,21 @@ $$
 where $H$ and $\omega$ are defined as:
 
 $$
-\begin{gathered}
-H = \sum_{k = 1}^N (\vec{z}_i - \overline{z})(\vec{z}_i - \vec{z})^T \\
-\vec{\omega} = \sum_{k=1}^N \left( \|\vec{z}_i^T\vec{z}_i\| - \frac{1}{N}\sum_{j=1}^N\|\vec{z}_j^T\vec{z}_j\| \right) (\vec{z}_i - \overline{z})
-\end{gathered}
+\begin{aligned}
+H &= \sum_{i = 1}^N (\vec{z}_i - \overline{z})(\vec{z}_i - \vec{z})^T \\
+&= N \Sigma_z \\
+\vec{\omega} &= \sum_{i=1}^N \left( \|\vec{z}_i^T\vec{z}_i\| - \frac{1}{N}\sum_{j=1}^N\|\vec{z}_j^T\vec{z}_j\| \right) (\vec{z}_i - \overline{z})
+\end{aligned}
 $$
+
+The $H$ matrix can be seen as a centered matrix that is the covariance matrix of new coordinates $\mathbf{Z}$ multiplied by number of observations $N$. $\vec{\omega}$ is a vector where $\omega_i$ is the centered $i$th $z$-coordinate scaled by a weight, where the weight is a centered magnitude of the $i$th $z$-coordinate.
 
 The optimal parametrization $(\hat{V}, \hat{c}, \hat{r})$ of the projection of $\mathbf{X} \in \mathbb{R}^{N \times D}$ onto the sphere $S_V(c, r)$ is:
 
 $$
 \begin{gathered}
 \hat{V} = (\vec{v}_1, \dots, \vec{v}_{d + 1}) \\
-\hat{c} = -\frac{\vec{\eta}^\star}{2}  \\
+\hat{c} = -\frac{\vec{\eta}^*}{2}  \\
 \hat{r} = \frac{1}{N} \sum_{k = 1}^N \left\|\vec{z}_i - \hat{c} \right\|
 \end{gathered}
 $$
@@ -67,38 +241,69 @@ $$
 \hat{\Psi}(\vec{x}_i) = \hat{c} + \frac{\hat{r}}{\| \hat{V}\hat{V}^T (\vec{x}_i - \hat{c}) \|}\hat{V}\hat{V}^T(\vec{x}_i - \hat{c})
 $$
 
-### Local SPCA
+### Algorithm
 
-We have now defined spherical PCA (SPCA) to project the data $\mathbf{X}$ down to single sphere $S_V$. However, this single sphere will typically not be a sufficient approximation for the inherent manifold $M$. Instead, we partition the space $\mathbb{R}^D$ into $k$ disjoint subsets $C_1, \dots, C_k$. For the $k$th disjoint subset, we can define a data matrix $\mathbf{X}_k = \{X_i : X_i \in C_k\}$ that is a partition of the original data that lies within $C_k$. After applying SPCA to $\mathbf{X}_k$, we obtain spherical volume, center, and radius $(\hat{V}_k, \hat{c}_k, \hat{r}_k)$ alongside projection map $\Phi_k$ as a map from $x\in C_k$ to $y \in S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k)$. A spherelets estimation $\hat{M}$ of the manifold $M$ can be obtained by setting $\hat{M} = \bigcup_{k = 1}^K \hat{M}_k$, where $\hat{M}_k$ is the local SPCA in the $k$th region and $\hat{M}_k = S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k) \cap C_k$
+We have now defined spherical PCA (SPCA) to project the data $\mathbf{X}$ down to single sphere $S_V$. In general, this single sphere will typically not be a sufficient approximation for the inherent manifold $M$. Instead, we partition the space $\mathbb{R}^D$ into $k$ disjoint subsets $C_1, \dots, C_k$. 
 
-### Assumptions
+For the $k$th disjoint subset, we can define a data matrix $\mathbf{X}_k = \{X_i : X_i \in C_k\}$ that is a partition of the original data that lies within $C_k$. After applying SPCA to $\mathbf{X}_k$, we obtain spherical volume, center, and radius $(\hat{V}_k, \hat{c}_k, \hat{r}_k)$ alongside projection map $\Phi_k$ as a map from $x\in C_k$ to $y \in S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k)$. A spherelets estimation $\hat{M}$ of the manifold $M$ can be obtained by setting $\hat{M} = \bigcup_{k = 1}^K \hat{M}_k$, where $\hat{M}_k$ is the local SPCA in the $k$th region and $\hat{M}_k = S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k) \cap C_k$.
 
-There are two main
+We thus arrive at the spherical PCA algorithm. The basic strokes of the spherical PCA process are:
 
-### Method
+  1. Subdivide the space (and dataset) into $k$ partitions: $\{C_k\}_{k=1}^K$ and $\{M_k\}_{k=1}^K$,
+  2. Calculate a submanifold $\hat{M_k}$ and projection map $\hat{\Psi_k}$ for each submanifold,
+  3. Find the union of $\{M_k\}_{k=1}^K$ and $\Psi_k$ to obtain estimates $\hat{M}$ and $\Psi$.
 
-The algorithm is as follows:
+The specific algorithm is as follows:
 
-## Strengths and Weaknesses
+![](algorithm_pic.png)
+
+## Discussion
+
+Previously within this paper, I have incorporated parts of the geometric intuition and connections to linear PCA in other sections but will rehash it briefly in this section as well. Within the Section 2.1, I also discuss the Main Theorem and its theoretical guarantees for the relative performance of spherelets in terms of covering number.
+
+Within this section, I will discuss the various strengths and weaknesses that spherelets provide relative to local linear PCA using hyperplanes.  I will also incorporate extensions and applications of spherelets to other aspects of dimension reduction and data visualization.
 
 ### Strengths
 
-  - Performs well in areas with high curvature that local PCA can't approximate
-  - Can perform OOS assessments and returns the underlying manifold
+The two main draws for spherical PCA are its flexibility and its ability to offer out of sample testing without reinitializaiton of the entire algorithm. However, as noted by Li and Dunson, other potential advantages to spherelets can be in lateral applications of the algorithm to other linear-based approximate methods like Isomap and LLE. Spherelets also can be extended to denoise data and stacks up well against competing, well-attested algorithms in the literature.
+
+  - **High curvature.** As mentioned prior, the motivating desire behind spherical PCA is to approximate manifolds in lower dimensions that other fully linear methods are not able to capture. Spherical PCA projects a subset of data down to a sphere living on an affine subspace of $\mathbb{R}^D$, allowing 
   
+  - **Analytic solution...** ... the depends on choice of partitioning algorithm. Because spherical PCA relies on a projection to affine subspace for a given partition $C_k$ in $\mathbb{R}^D$, there is a closed-form unique solution for a partition of the original dataset. However, the choice of partition algorithm can be done in myriad ways. In the examples below, I sometimes use a naive partitioning algorithm that splits the data into $k$ consecutive subsets, while the function written by Minerva Mukhopadhyay [@github] instead uses iterated PCA to recursively divide the dataset and run spherical PCA until a desired level of error is reached and no further gains in error can be achieved. Other algorithms mentioned before include METIS and cluster trees; in fact, any sort of clustering algorithm can be used, but care must be taken to avoid overfitting and computational expensiveness when $D >> d$.
+  
+  - **Modeling and visualization.** Like linear PCA, spherelets can be a powerful tool both to visualize intrinsically curved data. Examples given in the following section include datasets with curved manifolds that might perform poorly when modeled with hyperplanes, such as the Euler spiral and the 3D cylinder. Spherelets can also be used to build a parametrized model, since the algorithm returns the centers, radii, and subspace basis vectors in the form $S_{V}(c, r)$ of the spherelet that is used. 
+  
+  - **Out of sample testing.** Spherical PCA goes beyond what most locally linear methods halt at---spherelets define a manifold $M$. As such, spherical PCA lends itself easily to out-of-sample testing, since information is learned about the subspace directly. Given the results of the spherical PCA $\{S_{\hat{V}_k}(\hat{c}_k, \hat{r}_k)\}_{k=1}^{K}$, we can project new data down and measure the test MSE. One concern with this approach is that the curse of dimensionality comes into play, since $d$ is one of our tuning parameters in the spherelets algorithm, so a robust measure of error must be picked that does not grow exponentially with $d$.
+  
+  - **Spherical analog to linear methods.** As we will explore later, spherical PCA can be seen as a starting point to develop spherical settings for originally linear methods. Just as linear PCA is a precursor to other techniques, spherical PCA can also be seen as a spherical precursor to more complex techniques, where aspects of spherical PCA can be taken to better fit curved data.
+
 ### Weaknesses
-  - Struggles with areas of non-uniform curvature
-  - Struggles with non-uniform dimensions
-  - Must specify inherent dimension $d$
-  - Computationally expensive
-  - Dependent on choice of manifold subsetting
+
+While spherical PCA is capable of fitting manifolds that have higher degrees of curvature than linear PCA, spherelets still struggle in some similar areas akin to linear PCA. Main disadvantages of spherelets include sensitivity to non-uniform dimensions and curvature along the manifold and computational inefficiency when paired with a poor choice of partitioning algorithm and choice of intrinsic manifold dimensionality $d$.
+
+  - **Manifolds with non-uniform curvature.** The Main Theorem offers a perspective to why the spherical submanifold method is not particularly effective with manifolds with large changes in curvature. As $V_\epsilon$ approaches $V$, we have either 1) relaxed the accuracy threshold $\epsilon$ which is undesirable for the sake of attaining accurate and precise results, or 2) the covering number approaches that of local linear PCA using a dictionary of basis functions $\mathcal{H}$ that's based on hyperplanes instead of spheres. The first circumstance is a trivially poor example and is true of any algorithm. However, in the second circumstance, spherelets would not perform drastically different as opposed to local linear PCA.
+  
+  - **Differences in scale across dimensions.** As in linear PCA, spherelets are also sensitive to scale. A dataset with variables that differ drastically in range and variance would challenge spherelets the same way that linear PCA would be challenged. This is because in spherical PCA, the projection map $\Psi$ still relies on an eigendecomposition and transformation to affine subspace spanned by $V$ as a core principal. If one particular dimension displays a much higher degree of variance that outweighs the remaining dimensions, then the overall manifold may look up looking more and more *ellipse-like*. The Main Theorem states that the $\epsilon$-spherical set of points $F_{\epsilon}$ is affected by the difference between minimum and maximum curvature in the manifold, so more likely than not the spherelets algorithm would use an excessive amount of spheres to approximate the ellipsoid manifold. 
+  
+    With that being said, a potential avenue for exploration would be to generalize the concept of spherelets to "*ellipselets*" that would be able to incorporate different bounded axes within ellipsoids as a dictionary of basis functions. This would offer more flexibility to detect manifolds with greater extremes in curvature.
+  
+  - **User-supplied intrinsic dimension $d$.** A major downside to the spherelets algorithm is that it requires an input dimension $d$ or for the runner of the algorithm. The loss function is not guaranteed to be convex in this scenario, as with increased dimensionality in the form of $d$-hyperspheres, there is always the increased potential to overfit. Some degree of content knowledge is required on part of the user to either 1) specify if only one intrinsic dimension makes physical/realistic sense or 2) tune the $d$ parameter, which is often computationally expensive with complicated partitioning algorithms.
+  
+  - **Computationally expensive.** While the projection step of the algorithm is analytic, the partitioning of the data for an "optimal" solution is an NP-hard problem which may not be guaranteed to converge. Additionally, the curse of dimensionality appears in the Main Theorem, where poor approximations of the manifold result in $O(c^{-n/2})$ computational complexity as opposed to $O(c^{-n/3})$. The specified algorithm proposed by Li and Dunson also features computationally-intensive bottlnecks that do not scale well, such as matrix inversions (calculation of the $H^{-1}$ matrix) and traversing across matrices (calculating $\omega$ and $\mathbf{Z}$).
+  
+### Further Applications
+
+Many dimension reduction techniques rely on linear methods due to the well-behaved nature of linear objects. Some of these lend themselves to representation in a spherical subspace. Just as PCA can be seen as a starting point for other related techniques like CCA or NMF, spherelets can also be extended to myriad techniques. A couple options that I will cover briefly are manifold denoising and data visualization.
+
+  - **Manifold Denoising**. One class of denoising algorithms that exists serves to denoise data which is assumed to near a intrinsically lower-dimensional manifold. Gaussian Blurring Mean Shift (GBMS), Local Tangent Projection (LTP), and the in-between algorithm Manifold Blurring Mean Shift (MBMS) use linear methods to approximate a manifold obtained through standard PCA. Li and Dunson changed the underlying standard PCA assumption in MBMS to that of spherical PCA, which they deemed Spherical Manifold Blurring Mean Shift (SMBMS) or alternatively, Local Spherical Projection (LSP) [@li2019]. This method was shown to do better both with toy models as well as with real data (USPS handwritten digits dataset).
+    
+  - **Data Visualization**. Based on the experimentation of Li and Dunson, the gold standard for dimension reduction for the purpose of data visualization has been to use t-distributed Stochastic Neighbors (tSNE). In a another paper titled "Geodesic Distance Estimation with Spherelets", Li and Dunson extend the concept of tSNE to use geodesic distance along the surfaces of derived spheres instead of Euclidean distance [@geodesic].
 
 ## Examples
 
 To generate numerical examples, I used the `SPCA` and `SS_calc` functions written by co-author Minerva Mukhopadhyay [@github]. The `SPCA` function takes in a matrix of $N$ observations $\vec{x}_i \in \mathbb{R}^{D}, i \in 1, \dots, N$ and returns the error given by spherical and local PCA (`SS` and `SS_new`), as well as the projected values `Y_D`.
 
 ```{r example_setup}
-
 partition <- function(data, k) {
   # partitions data
   bin <- floor(nrow(data) / k)
@@ -121,13 +326,44 @@ spca <- function(x, dimension) {
                     c.d = out$c_d)
   return(ss_out)
 }
+
+get_mse <- function(spca_obj) {
+  pca_mse <- spca_mse <- 0
+  for (obj in spca_obj) {
+    N <- nrow(obj$Y_D)
+    pca_mse <- pca_mse + (obj$SS_new * N)
+    spca_mse <- spca_mse + (obj$SS * N)
+  }
+  return(c(pca_mse, spca_mse))
+}
+
+plot_mse <- function(ss, data) {
+  ss <- ss/nrow(data)
+  par(mar = c(2, 2, 1, 1))
+  plot(log10(ss)[,1], type = "b", col = "red",
+       ylim = range(log10(ss)), xlab = "k", ylab = "log(MSE)", main = "log(MSE)")
+  points(log10(ss)[,2], type = "b", col = "blue", pch = 2)
+  legend("bottomleft", legend = c("PCA", "SPCA"), fill = c("red", "blue"), cex = 0.8)
+}
 ```
 
 ### Euler Spiral
 
-```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 3, 8$.'}
+The Euler spiral is a curve in $\mathbb{R}^1$ that has a curvature that changes linearly with arc length. In other words, $\kappa(s) = s$. The Euler spiral can be parametrized as follows:
+
+$$
+\begin{bmatrix}x(s) \\ y(s)\end{bmatrix} = 
+\begin{bmatrix}
+\displaystyle\int_0^s \cos(t^2) dt \\
+\displaystyle\int_0^s \sin(t^2) dt
+\end{bmatrix} \hspace{0.1in} s \in [0, 4]
+$$
+
+We use the Euler spiral as a demonstration to see how spherical PCA is able to handle regions with curvature. The first set of graphs shows what spherical PCA returns after partitioning the Euler spiral in a naive manner (splitting the data so $|X_1| = \cdots = |X_k|$, each set is the same size). The second set of plots uses the more robust iterated PCA method by Mukhopodhyay. Progressive plots show deeper levels of recursion up to a tolerance level $\delta$.
+
+```{r euler_demo, fig.cap = "Euler spiral.", fig.width = 3, fig.height = 4}
 # generating euler spiral data
-s <- seq(0, 3, by = 0.001)
+s <- seq(0, 4, by = 0.001)
 data <- matrix(rep(0, 2 * length(s)), ncol = 2)
 for (i in 1:length(s)) {
   data[i,1] <- integrate(function(t) sin(t^2),
@@ -137,81 +373,220 @@ for (i in 1:length(s)) {
                      lower = 0,
                      upper = s[i])$value
 }
+plot(data, type = "l", lwd = 4, xlab = "", ylab = "")
+```
 
-par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
-euler <- function(k) {
-  d <- partition(data, k)
-  spca_d <- lapply(d, FUN = function(x) spca(x, 2))
-  rainbow_cols <- alpha(sample(rainbow(k)), 0.08)
-  plot(data, type = "l", lwd = 4,
-       xlab = "", ylab = "")
-  for (i in 1:k) {
-    points(spca_d[[i]]$Y_D, col = rainbow_cols[i], pch = 19, cex = 0.6)
+
+```{r euler, fig.cap='Spherical PCA performed on an Euler spiral with $k = 1, \\ldots, 5$. Partitioning done naively.', fig.height = 4.5}
+par(mfrow = c(2, 3), mar = c(2, 2, 1, 1))
+
+euler <- function(from = 1, k) {
+  ss <- matrix(rep(0, 2 * (k - from + 1)), ncol = 2)
+  
+  for (j in from:k) {
+    d <- partition(data, j)
+    spca_d <- lapply(d, FUN = function(x) spca(x, 1))
+    ss[j,] <- get_mse(spca_d)
+    rainbow_cols <- alpha(sample(rainbow(j)), 0.08)
+    plot(data, type = "l", lwd = 4,
+         xlab = "", ylab = "", main = paste("k =", j))
+    for (i in 1:j) {
+      points(spca_d[[i]]$Y_D, col = rainbow_cols[i], pch = 19, cex = 0.6)
+    }
   }
+  plot_mse(ss, data)
 }
 
-euler(3); euler(10)
+euler(1, 5)
 ```
+
+```{r euler2, fig.cap="Spherical PCA partitioned using iterated PCA according to Mukhopadhyay 2019. Note that using iterated PCA results in better and better fits as the number of partitions increases, but the spherelets algorithm fits many more circles than necessary in the tight spiral.", fig.height = 4.5}
+epsilon=-5
+epsilon2=0.0001
+N.min = 5
+SPCA_part=SPCA_Manifold_approx(data, data, 1,epsilon,epsilon2,N.min)
+Y_hat=SPCA_part[[1]]
+
+rainbow_cols <- alpha(sample(rainbow(5)), 0.3)
+par(mfrow = c(2, 3), mar = c(2, 2, 1, 1))
+for(i in 1:5)
+{
+  plot(data, xlab = "", ylab = "", main = paste("k =", i+1))
+  points(Y_hat[[i+1]],xlab=" ", ylab=" ", col = rainbow_cols[i])
+}
+
+plot(SPCA_part[[2]][,2], type = "b", main = "Log(MSE)", col = "blue",
+     xlab = "", ylab = "")
+```
+
+We see that the difference in partitioning algorithm made a drastic difference in how the spherical PCA ended up dividing the Euler spiral. For low values of $k$, the circles were distributed across the length of the Euler spiral to cover as much of the "tail" and the "whorl" as much as possible. However, with higher levels of $k$, it became clear that the algorithm was attempting to cover the tight curl by lining up circles side by side down the arc length as opposed to placing overlapping circles. The naive partitioning performed in a more intuitive manner by aligning as much of the curve with the sphere as possible.
 
 ### Helix
 
-```{r helix, fig.cap='Spherical PCA performed on a helix with $k = 3, 8$.'}
+A helix has constant curvature $\kappa$ and is a simple curve in $\mathbb{R}^3$:
+
+$$
+\begin{bmatrix}
+x(s) \\ y(s) \\ z(s)
+\end{bmatrix} =
+\begin{bmatrix}
+\cos(s) \\ sin(s) \\ s
+\end{bmatrix}, \, s \in [0, 5\pi]
+$$
+
+```{r helix, fig.cap='Spherical PCA performed on a helix with $k = 1, \\dots, 7$. Partitioning done naively. MSE plot included.'}
 # generating helix data
-s <- seq(0, 6*pi, by=0.1)
+s <- seq(0, 5*pi, by=0.05)
 data <- matrix(c(cos(s), sin(s), s), ncol = 3)
 
 # spherical pca on helix
-par(mfrow = c(1, 2), mar = c(2, 2, 1, 1))
-spiral <- function(k) {
-  d <- partition(data, k)
-  spca_d <- lapply(d, FUN = function(x) spca(x, 3))
-  rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
-  spl <- scatterplot3d(data, type = "l", lwd = 4,
-                       xlab = "", ylab = "", zlab = "")
-  for (i in 1:k) {
-    spl$points3d(spca_d[[i]]$Y_D, 
-                 col = rainbow_cols[i], pch = 19, cex = 0.6)
+par(mfrow = c(2, 4), mar = c(2, 2, 1, 1))
+
+helix <- function(from = 1, k) {
+  ss <- matrix(rep(0, 2 * (k - from + 1)), ncol = 2)
+  for (j in from:k) {
+    d <- partition(data, j)
+    spca_d <- lapply(d, FUN = function(x) spca(x, 1))
+    ss[j,] <- get_mse(spca_d) # storing MSE in matrix
+    rainbow_cols <- alpha(sample(rainbow(j)), 0.8)
+    spl <- scatterplot3d(data, type = "l", lwd = 4,
+                         xlab = "", ylab = "", zlab = "",
+                         mar = c(1.5, 1.5, 1.5, 1.5), main = paste("k =", j),
+                         axis = T, tick.marks = F, label.tick.marks = F)
+    for (i in 1:j) {
+      spl$points3d(spca_d[[i]]$Y_D, 
+                   col = rainbow_cols[i], pch = 19, cex = 0.6)
+    }
   }
+  plot_mse(ss, data)
 }
 
-spiral(3); spiral(8)
+helix(1, 7)
 ```
+
+The native partition does poorly at very low values of $k$ but performs much better with increased values of $k$, since circles can perfectly approximate a setion of the helix due to their constant curvature. 
 
 ### Cylinder
 
-```{r cylinder, fig.cap='Spherical PCA performed on a cylinder with $k = 3, 8$.'}
-N <- 10^3
+An unbounded cylinder is an interesting toy model for spherical PCA since in two dimensions the curvature along the surface of the cylinder is constant $\kappa$, but along the axis of the cylinder, curvature is infinite. We know that spherelets tend to do poorly when the range in curvature along the manifold is high. A cylinder is parametrized below:
+
+$$
+\begin{bmatrix}x(s) \\ y(s) \\ z(s)\end{bmatrix} = 
+\begin{bmatrix}
+\cos(s) \\
+\sin(s) \\
+3s
+\end{bmatrix} \hspace{0.1in} s \in [0, 2\pi]
+$$
+
+I sampled 2500 points along the surface of the cylinder to generate the dataset:
+
+```{r cylinder_demo, fig.cap = "A cylinder in $\\mathbb{R}^3$.", fig.height = 4}
+# generating euler spiral data
+N <- 2500
 theta <- runif(N, 0, 2*pi)
-data <- matrix(c(cos(theta), sin(theta), sort(runif(N, 0, 5))), 
+data <- matrix(c(cos(theta), sin(theta), 3 * sort(runif(N, 0, 5))), 
                ncol = 3)
-
-# spherical pca on cylinder
-par(mfrow = c(1, 3), mar = c(1, 1, 1, 1))
-cylinder <- function(k, new.plot = F) {
-  d <- partition(data, k)
-  spca_d <- lapply(d, FUN = function(x) spca(x, 3))
-  rainbow_cols <- alpha(sample(rainbow(k)), 0.8)
-  if (new.plot) {
-    spl <- scatterplot3d(data, color = rgb(0, 0, 0, 0.5),
-                       xlab = "", ylab = "", zlab = "", 
-                       mar = c(1, 1, 1, 1))
-  }
-  mse <- c()
-  for (i in 1:k) {
-    if (new.plot) {
-      spl$points3d(spca_d[[i]]$Y_D, 
-                 col = rainbow_cols[i], pch = 19, cex = 0.2)
-    }
-    mse <- c(mse, (spca_d[[i]]$Y_D - d[[i]])^2)
-  }
-  return(mean(mse))
-}
-
-cylinder(3, new.plot = T); cylinder(8, new.plot = T)
-vec_cylinder <- Vectorize(cylinder)
-plot(vec_cylinder(1:10), main = "MSE", xlab = "k")
+scatterplot3d(data, cex.symbols = 0.4, xlab = "", ylab = "", zlab = "")
 ```
 
-We see that SPCA is not fully capable of handling a cylinder.
+```{r cylinder, fig.cap='Spherical PCA performed on a cylinder with $k = 1, \\dots, 7$. Partitioning done naively. MSE plot included.', fig.height = 4}
+# spherical pca on cylinder
+par(mfrow = c(2, 4), mar = c(1, 1, 1, 1))
+
+cylinder <- function(from = 1, k) {
+  ss <- matrix(rep(0, 2 * (k - from + 1)), ncol = 2)
+  for (j in from:k) {
+    d <- partition(data, j)
+    spca_d <- lapply(d, FUN = function(x) spca(x, 2))
+    ss[j - from + 1,] <- get_mse(spca_d) # storing MSE in matrix
+    rainbow_cols <- alpha(sample(rainbow(j)), 0.4)
+    spl <- scatterplot3d(data, color = rgb(0, 0, 0, 0), xlim = c(-2, 2), ylim = c(-2, 2),
+                         xlab = "", ylab = "", zlab = "", main = paste("k = ",j),
+                         cex.symbols = 0.4,
+                         mar = c(0, 0, 0, 0), axis = T, tick.marks = F, label.tick.marks = F)
+    for (i in 1:j) {
+      spl$points3d(spca_d[[i]]$Y_D, 
+                   col = rainbow_cols[i], pch = 19, cex = 0.4)
+    }
+  }
+  plot_mse(ss, data)
+}
+
+cylinder(2, 8)
+```
+
+```{r, fig.height = 4, fig.cap = "Spherical PCA on a cylinder based on iterated PCA. Notice that for the $k = 2$ case, the iterated PCA version is able to much more reasonably approximate the sphere, unlike the naive partioning algorithm, demonstrating that the choice in partitioning algorithm can have profound effects on final outcome for low $k$."}
+N <- 1000
+theta <- runif(N, 0, 2*pi)
+data <- matrix(c(cos(theta), sin(theta), 3 * sort(runif(N, 0, 5))), 
+               ncol = 3)
+
+epsilon=-5
+epsilon2=0.0001
+N.min = 5
+SPCA_part=SPCA_Manifold_approx(data, data, 2 ,epsilon,epsilon2,N.min)
+Y_hat=SPCA_part[[1]]
+
+rainbow_cols <- alpha(sample(rainbow(7)), 0.3)
+par(mfrow = c(2, 4), mar = c(2, 2, 1, 1))
+for (i in 1:7) {
+  scatterplot3d(Y_hat[[i+1]], xlab = "", ylab = "", zlab = "", main = paste("k =", i+1),
+                xaxt = "n", yaxt = "n", axis = T, mar = c(0, 0, 0, 0),
+                tick.marks = F, label.tick.marks = F)
+  # spl$points3d(data,xlab=" ", ylab=" ", col = rainbow_cols[i])
+}
+
+plot(SPCA_part[[2]][,2], type = "b", main = "Log(MSE)", col = "blue",
+     xlab = "", ylab = "")
+```
+
+While SPCA outperforms regular PCA when it comes to MSE for cylinders, we see that spherical PCA still struggles a little with low values of partitioning $k$. We can notice a slight difference visually in how the two partitioning algorithms handle a cylinder. However, it seems that in both scenarios, spherical PCA tends to stack identical spheres atop each other along the axis of the cylinder in order to cover as much of the cylinder in as few spheres as possible, which creates a "bumpy" cylinder. An ellipsoid may be better suited to handle this particular task.
+
+### Handwritten Digits (MNIST)
+
+The MNIST dataset is a famous one consisting of handwritten images. There are a total of 42,000 observations in the dataset. Each digit is coded as a vector in $\mathbb{R}^784$ to account for the $28 \times 28$ pixel image. In this case, lying on a lower-dimensional manifold would be attempting to find $d$-dimensional hyperspheres that the observations lie near. Partitioning the dataset using iteracted PCA would be computationally expensive given the size of the dataset and is difficult to define in 784-dimensional space. For the sake of simplicity and to illustrate the effect of dimensionality, the partitioning step is skipped in this implementation of spherical SPCA. Instead, different values of $d$ are tuned to show how spherical PCA might be applied.
+
+```{r digits}
+mse <- function(pred, obs) {
+  sto <- numeric(nrow(pred)) 
+  for (i in 1:nrow(pred)) {
+    sto[i] <- mean((pred[i,] - obs[i,])^2)
+  }
+  return(mean(sto))
+}
+
+digits8 <- digits$pixels[digits$labels == 8, ]
+zerocols <- which(colSums(digits8[1:100,]) == 0)
+digits8.nums <- digits8[1:100,-zerocols]
+
+# cross validing number of dimensions
+dims <- c(1, 2, 3, 4, 5, 10, 15, 20, 30, 40, 50, 75)
+mses <- numeric(length(dims))
+first_preds <- matrix(rep(0, length(dims) * 784), ncol = 784)
+
+# extracting the prediction of the first image 
+for (i in 1:length(dims)) {
+  out <- spca(digits8.nums, dimension = dims[i])
+  first_preds[i,-zerocols] <- out$Y_D[1,]
+  mses[i] <- mse(out$Y_D, digits8.nums)
+}
+
+
+```
+
+```{r, fig.height = 3, fig.width = 2, fig.cap="The first handwritten 8 digit taken from the MNIST dataset."}
+# displaying images
+image(matrix(digits8[1,], nrow = 28), col = topo.colors(12),
+      xlab = "", ylab = "", xaxt = "n", yaxt = "n")
+```
+
+```{r, fig.height = 4.5, fig.cap = "The projected first handwritten 8 digit based on varying dimensions $d$. The definition of the digit gets steadiliy and steadily less clear from the first image $d=1$, since the first image is most likely the closest to a simple average of all the observed digits. Once $d$ crosses the $d=15$ mark, it seems to regain clarity, though at this point $d$ approaches sample size and we are nearing overfitting. A balance must be struck between optimal $d$ to not be overly general but also not to be overly fit so as to lose generality. Therein lies the conundrum of spherical PCA!"}
+par(mfrow = c(3, 4), mar = c(2, 2, 1, 1))
+for (i in 1:length(dims)) {
+  image(matrix(first_preds[i,], nrow = 28), main = paste("d =", dims[i]),
+        xlab = "", ylab = "", xaxt = "n", yaxt="n")
+}
+```
 
 ## References
