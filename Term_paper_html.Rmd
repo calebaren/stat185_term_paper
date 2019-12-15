@@ -299,7 +299,7 @@ Many dimension reduction techniques rely on linear methods due to the well-behav
     
   - **Data Visualization**. Based on the experimentation of Li and Dunson, the gold standard for dimension reduction for the purpose of data visualization has been to use t-distributed Stochastic Neighbors (tSNE). In a another paper titled "Geodesic Distance Estimation with Spherelets", Li and Dunson extend the concept of tSNE to use geodesic distance along the surfaces of derived spheres instead of Euclidean distance [@geodesic].
 
-## Examples
+## Examples {.tabset .tabset-pills .tabset-fade}
 
 To generate numerical examples, I used the `SPCA` and `SS_calc` functions written by co-author Minerva Mukhopadhyay [@github]. The `SPCA` function takes in a matrix of $N$ observations $\vec{x}_i \in \mathbb{R}^{D}, i \in 1, \dots, N$ and returns the error given by spherical and local PCA (`SS` and `SS_new`), as well as the projected values `Y_D`.
 
